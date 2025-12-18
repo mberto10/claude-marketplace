@@ -2,6 +2,46 @@
 
 Personal collection of Claude Code plugins, commands, agents, skills, and configurations.
 
+## Installation
+
+### Add the Marketplace
+
+In Claude Code, run:
+
+```
+/plugin marketplace add mberto10/claude-marketplace
+```
+
+### Install Plugins
+
+After adding the marketplace, install plugins with:
+
+```
+/plugin install example-plugin@claude-marketplace
+```
+
+### Other Commands
+
+```bash
+# Browse all plugins
+/plugin
+
+# List known marketplaces
+/plugin marketplace list
+
+# Update marketplace
+/plugin marketplace update claude-marketplace
+
+# Remove marketplace
+/plugin marketplace remove claude-marketplace
+```
+
+## Available Plugins
+
+| Plugin | Description | Category |
+|--------|-------------|----------|
+| `example-plugin` | Example plugin demonstrating structure for commands, agents, skills, and hooks | utility |
+
 ## Structure
 
 ```
@@ -19,49 +59,6 @@ claude-marketplace/
         └── skills/           # Autonomous skills
 ```
 
-## Installation in Another Project
-
-### Step 1: Clone the Marketplace
-
-```bash
-git clone https://github.com/mberto10/claude-marketplace.git ~/.claude-marketplace
-```
-
-### Step 2: Link Plugins to Your Project
-
-Navigate to your project directory and create symlinks:
-
-```bash
-# Create .claude directory if it doesn't exist
-mkdir -p .claude
-
-# Link specific plugin components
-ln -s ~/.claude-marketplace/plugins/example-plugin/commands .claude/commands
-ln -s ~/.claude-marketplace/plugins/example-plugin/agents .claude/agents
-```
-
-### Step 3: Alternative - Copy Plugin Configuration
-
-If you prefer copying instead of symlinking:
-
-```bash
-# Copy entire plugin to your project
-cp -r ~/.claude-marketplace/plugins/example-plugin/.claude-plugin .claude-plugin
-cp -r ~/.claude-marketplace/plugins/example-plugin/commands .claude/commands
-cp -r ~/.claude-marketplace/plugins/example-plugin/agents .claude/agents
-```
-
-### Step 4: Merge MCP Configuration
-
-Add MCP servers from plugin to your project's `.mcp.json`:
-
-```bash
-# If you don't have .mcp.json yet
-cp ~/.claude-marketplace/plugins/example-plugin/.mcp.json .mcp.json
-
-# Or manually merge the mcpServers from the plugin
-```
-
 ## Creating New Plugins
 
 1. Create a new directory under `plugins/`:
@@ -69,13 +66,16 @@ cp ~/.claude-marketplace/plugins/example-plugin/.mcp.json .mcp.json
    mkdir -p plugins/my-plugin/{commands,agents,skills,hooks,.claude-plugin}
    ```
 
-2. Add `plugin.json`:
+2. Add `.claude-plugin/plugin.json`:
    ```json
    {
      "name": "my-plugin",
      "version": "1.0.0",
      "description": "My custom plugin",
-     "author": "Your Name"
+     "author": {
+       "name": "Your Name"
+     },
+     "license": "MIT"
    }
    ```
 
@@ -84,55 +84,45 @@ cp ~/.claude-marketplace/plugins/example-plugin/.mcp.json .mcp.json
    - **Agents**: `.md` files in `agents/`
    - **Skills**: Directories in `skills/` with `SKILL.md`
    - **Hooks**: `hooks.json` in `hooks/`
+   - **MCP Servers**: `.mcp.json` in plugin root
 
-4. Register in `marketplace.json`:
+4. Register in `.claude-plugin/marketplace.json`:
    ```json
    {
      "plugins": [
        {
          "name": "my-plugin",
          "source": "./plugins/my-plugin",
-         "description": "My custom plugin"
+         "description": "My custom plugin",
+         "version": "1.0.0",
+         "author": {
+           "name": "Your Name"
+         },
+         "category": "utility"
        }
      ]
    }
    ```
 
-## Quick Start Script
+## Using in Team Projects
 
-Create this script in your target project to quickly load marketplace plugins:
+Add to your project's `.claude/settings.json` for automatic installation:
 
-```bash
-#!/bin/bash
-# load-marketplace.sh
-
-MARKETPLACE=~/.claude-marketplace
-PLUGIN=${1:-example-plugin}
-
-mkdir -p .claude
-
-# Link commands if they exist
-if [ -d "$MARKETPLACE/plugins/$PLUGIN/commands" ]; then
-    ln -sf "$MARKETPLACE/plugins/$PLUGIN/commands" .claude/commands
-    echo "Linked commands from $PLUGIN"
-fi
-
-# Link agents if they exist
-if [ -d "$MARKETPLACE/plugins/$PLUGIN/agents" ]; then
-    ln -sf "$MARKETPLACE/plugins/$PLUGIN/agents" .claude/agents
-    echo "Linked agents from $PLUGIN"
-fi
-
-# Copy MCP config if it exists
-if [ -f "$MARKETPLACE/plugins/$PLUGIN/.mcp.json" ]; then
-    cp "$MARKETPLACE/plugins/$PLUGIN/.mcp.json" .mcp.json
-    echo "Copied MCP configuration"
-fi
-
-echo "Plugin $PLUGIN loaded!"
+```json
+{
+  "extraKnownMarketplaces": {
+    "claude-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "mberto10/claude-marketplace"
+      }
+    }
+  },
+  "enabledPlugins": [
+    "example-plugin@claude-marketplace"
+  ]
+}
 ```
-
-Usage: `./load-marketplace.sh example-plugin`
 
 ## License
 
