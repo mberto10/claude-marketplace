@@ -17,7 +17,7 @@ In Claude Code, run:
 After adding the marketplace, install plugins with:
 
 ```
-/plugin install example-plugin@claude-marketplace
+/plugin install example-plugin@mberto-compound
 ```
 
 ### Other Commands
@@ -30,10 +30,10 @@ After adding the marketplace, install plugins with:
 /plugin marketplace list
 
 # Update marketplace
-/plugin marketplace update claude-marketplace
+/plugin marketplace update mberto-compound
 
 # Remove marketplace
-/plugin marketplace remove claude-marketplace
+/plugin marketplace remove mberto-compound
 ```
 
 ## Available Plugins
@@ -111,7 +111,7 @@ Add to your project's `.claude/settings.json` for automatic installation:
 ```json
 {
   "extraKnownMarketplaces": {
-    "claude-marketplace": {
+    "mberto-compound": {
       "source": {
         "source": "github",
         "repo": "mberto10/claude-marketplace"
@@ -119,7 +119,7 @@ Add to your project's `.claude/settings.json` for automatic installation:
     }
   },
   "enabledPlugins": [
-    "example-plugin@claude-marketplace"
+    "example-plugin@mberto-compound"
   ]
 }
 ```
