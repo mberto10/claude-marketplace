@@ -1,0 +1,9 @@
+{
+  "name": "writing-studio",
+  "version": "1.0.0",
+  "description": "A comprehensive, interactive writing assistant that maintains your personal style across brainstorming, planning, drafting, and editing workflows",
+  "author": {
+    "name": "Maximilian Bruhn"
+  },
+  "keywords": ["writing", "style", "drafting", "editing", "brainstorming", "content"]
+}
