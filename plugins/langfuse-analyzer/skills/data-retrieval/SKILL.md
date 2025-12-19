@@ -48,27 +48,31 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py -
 ### Filtered Retrieval
 
 ```bash
-# By case ID
+# By metadata field (e.g., project_id, environment, user_id)
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
-  --last 2 --case 0001
+  --last 2 --filter-field project_id --filter-value myproject
 
 # By tags
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
-  --last 5 --tags production case:0001
+  --last 5 --tags production api-v2
 
 # Custom time range
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
   --last 10 --days 3
 ```
 
+**Metadata filtering options:**
+- `--filter-field NAME` - Any metadata field to filter by
+- `--filter-value VALUE` - Value to match for the filter field
+
 ### Score-Based Filtering
 
-Filter traces by quality scores for optimization workflows:
+Filter traces by scores for optimization workflows:
 
 ```bash
-# Find failing traces (quality score <= 7.0)
+# Find low-scoring traces (score <= 7.0)
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
-  --last 20 --case 0001 --max-score 7.0 --mode minimal
+  --last 20 --max-score 7.0 --mode minimal
 
 # Find high-quality traces for golden sets (score >= 9.0)
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
@@ -76,11 +80,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
 
 # Filter by specific score name
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
-  --last 10 --min-score 8.0 --score-name editor_final_score
+  --last 10 --min-score 8.0 --score-name custom_quality_score
 
-# Combined: failing traces for a specific case
+# Combined: failing traces for a specific project
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
-  --last 30 --case 0001 --max-score 7.0 --mode minimal
+  --last 30 --filter-field project_id --filter-value myproject --max-score 7.0 --mode minimal
 ```
 
 **Score filtering options:**
@@ -179,14 +183,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
   --trace-id <after_id> --mode io
 ```
 
-### Investigate Tool Selection
+### Investigate Specific Workflow
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
-  --last 1 --case 0001 --mode io
+  --last 1 --filter-field workflow_name --filter-value checkout --mode io
 ```
 
-Look for tool call observations to see which tools were selected and their outputs.
+Look for span observations to see which operations were performed and their outputs.
 
 ### Curate Regression Dataset
 
@@ -195,7 +199,7 @@ Identify failing traces for dataset curation:
 ```bash
 # Step 1: Find failing traces
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
-  --last 20 --case 0001 --max-score 7.0 --mode minimal
+  --last 20 --max-score 7.0 --mode minimal
 
 # Step 2: Investigate specific failing trace
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
@@ -218,7 +222,7 @@ The retriever outputs formatted markdown to stdout with:
 
 **No traces found:**
 - Check time range with `--days`
-- Verify case ID or tags exist
+- Verify filter field/value or tags exist in your traces
 - Confirm Langfuse credentials are correct
 
 **Connection errors:**

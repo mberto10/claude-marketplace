@@ -1,192 +1,412 @@
 ---
 name: langfuse-experiment-runner
-description: This skill should be used when the user asks to "run experiment", "validate against dataset", "test config changes", "compare before/after", "run regression tests", or needs to execute writing workflow experiments with automatic evaluation.
+description: This skill should be used when the user asks to "run experiment", "evaluate dataset", "test prompts on dataset", "compare experiment runs", "analyze experiment results", or needs to execute and analyze experiments on Langfuse datasets with custom evaluators.
 ---
 
 # Langfuse Experiment Runner
 
-Execute writing ecosystem workflows against datasets with automatic tracing and evaluation.
+Run experiments on datasets with custom task and evaluator scripts. Analyze results and compare runs.
 
 ## When to Use
 
-- Validating config changes against regression datasets
-- Comparing before/after performance
-- Running regression tests after fixes
-- Measuring quality improvements
+- Running experiments on Langfuse datasets
+- Evaluating prompt/model changes against test sets
+- Comparing multiple experiment runs
+- Analyzing score distributions and failures
+- Building regression test workflows
 
-## Basic Usage
+## Operations
 
-```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
-  --dataset "case_0001_regressions" \
-  --name "Fix: Add earnings calendar tool"
-```
+### Run Experiment
 
-## Full Options
+Execute a task on every item in a dataset with optional evaluators:
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
-  --dataset "case_0001_regressions" \
-  --name "Fix: Add earnings calendar tool" \
-  --description "Added finnhub.calendar_earnings to required tools" \
-  --evaluators quality_score word_count \
-  --max-concurrency 2 \
-  --metadata '{"config_version": "v2.1"}'
+  run \
+  --dataset "my-regression-tests" \
+  --run-name "v2.1-test" \
+  --task-script /path/to/my_task.py \
+  --evaluator-script /path/to/my_evaluators.py \
+  --max-concurrency 5
 ```
 
-## Built-in Evaluators
+**Required:**
+- `--dataset` - Name of the Langfuse dataset
+- `--run-name` - Unique name for this run
+- `--task-script` - Python script with `task()` function
 
-### quality_score (default)
-Compares output `quality_score` to expected minimum from dataset item.
+**Optional:**
+- `--evaluator-script` - Python script with evaluator functions
+- `--max-concurrency` - Parallel executions (default: 5)
+- `--description` - Run description
 
-**Passes when:** `actual_score >= expected_output.min_quality_score`
+### List Runs
 
-### word_count (default)
-Validates output meets minimum word count from dataset item.
+See all experiment runs for a dataset:
 
-**Passes when:** `len(final_article.split()) >= expected_output.min_word_count`
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  list-runs --dataset "my-regression-tests"
+```
 
-## Experiment Report Output
+### Get Run Details
 
-The runner outputs a markdown report:
+Get full details of a specific run:
 
-```markdown
-# Experiment Results: Fix: Add earnings calendar tool
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  get-run --dataset "my-regression-tests" --run-name "v2.1-test"
+```
 
-**Dataset:** case_0001_regressions
-**Items:** 5
-**Run Name:** fix_earnings_v1
+### Compare Runs
 
-## Summary
+Compare score distributions across runs:
 
-| Metric | Value |
-|--------|-------|
-| Items Processed | 5 |
-| Pass Rate | 80% (4/5) |
-| Avg Quality Score | 8.7 |
-| Total Duration | 45.2s |
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  compare \
+  --dataset "my-regression-tests" \
+  --runs "v2.0-test" "v2.1-test" "v2.2-test"
+```
 
-## Item Results
+### Analyze Run
 
-### Item 1: MSFT Analysis ✅
-- **Quality:** 9.2/10 (expected >= 9.0)
-- **Word Count:** 1050 (expected >= 800)
-- **Trace ID:** `abc123...`
+Deep-dive into run results with failure analysis:
 
-### Item 2: GOOGL Analysis ❌
-- **Quality:** 6.8/10 (expected >= 9.0)
-- **Word Count:** 920 (expected >= 800)
-- **Trace ID:** `def456...`
-- **Issues:** quality_score below threshold
+```bash
+# Show all low-scoring items
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  analyze \
+  --dataset "my-regression-tests" \
+  --run-name "v2.1-test" \
+  --show-failures
 
-## Failed Items
+# Filter by specific score threshold
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  analyze \
+  --dataset "my-regression-tests" \
+  --run-name "v2.1-test" \
+  --score-name accuracy \
+  --score-threshold 0.7
+```
 
-| Item | Expected | Actual | Reason |
-|------|----------|--------|--------|
-| GOOGL | >= 9.0 | 6.8 | Quality score below threshold |
+## Writing Task Scripts
 
-## Next Steps
+The task script defines what to execute for each dataset item. It must contain a `task` function:
 
-1. Review failed item traces in Langfuse
-2. Investigate root cause of Item 2 failure
-3. Apply additional fixes if needed
-4. Re-run experiment
+```python
+# my_task.py
+
+def task(*, item, **kwargs):
+    """
+    Execute task on a dataset item.
+
+    Args:
+        item: DatasetItemClient with:
+            - item.input: The input data
+            - item.expected_output: Expected output (if set)
+            - item.metadata: Item metadata
+
+    Returns:
+        The output to be evaluated
+    """
+    from openai import OpenAI
+
+    client = OpenAI()
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "Answer the question accurately."},
+            {"role": "user", "content": item.input}
+        ]
+    )
+
+    return response.choices[0].message.content
+```
+
+### Task Script Examples
+
+**Simple LLM call:**
+```python
+def task(*, item, **kwargs):
+    from langfuse.openai import OpenAI
+    client = OpenAI()
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": item.input}]
+    )
+    return response.choices[0].message.content
+```
+
+**Using a Langfuse prompt:**
+```python
+def task(*, item, **kwargs):
+    from langfuse import Langfuse
+    from openai import OpenAI
+
+    langfuse = Langfuse()
+    prompt = langfuse.get_prompt("my-prompt", label="production")
+
+    client = OpenAI()
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": prompt.prompt},
+            {"role": "user", "content": item.input}
+        ]
+    )
+    return response.choices[0].message.content
+```
+
+**Custom pipeline:**
+```python
+def task(*, item, **kwargs):
+    from my_pipeline import run_pipeline
+    return run_pipeline(item.input, config=item.metadata)
+```
+
+## Writing Evaluator Scripts
+
+Evaluator scripts define how to score outputs. Export evaluators in an `EVALUATORS` list:
+
+```python
+# my_evaluators.py
+from langfuse import Evaluation
+
+def exact_match(*, output, expected_output, **kwargs) -> Evaluation:
+    """Check if output exactly matches expected."""
+    match = output.strip() == expected_output.strip() if expected_output else False
+    return Evaluation(
+        name="exact_match",
+        value=1.0 if match else 0.0,
+        comment="Exact match" if match else "No match"
+    )
+
+def contains_expected(*, output, expected_output, **kwargs) -> Evaluation:
+    """Check if expected output is contained in response."""
+    if not expected_output:
+        return Evaluation(name="contains", value=0.0, comment="No expected output")
+
+    contained = expected_output.lower() in output.lower()
+    return Evaluation(
+        name="contains",
+        value=1.0 if contained else 0.0
+    )
+
+def response_length(*, output, **kwargs) -> Evaluation:
+    """Measure response length (normalized)."""
+    length = len(output)
+    # Normalize: 0-100 chars = 0.0, 100-500 = 0.5, 500+ = 1.0
+    if length < 100:
+        score = length / 100 * 0.5
+    elif length < 500:
+        score = 0.5 + (length - 100) / 400 * 0.5
+    else:
+        score = 1.0
+
+    return Evaluation(name="length", value=score, comment=f"{length} chars")
+
+# Export evaluators to use
+EVALUATORS = [exact_match, contains_expected, response_length]
+```
+
+### Evaluator Function Signature
+
+```python
+def my_evaluator(
+    *,
+    output: Any,           # Task output
+    expected_output: Any,  # Expected output from dataset item
+    input: Any,            # Original input
+    **kwargs               # Additional context
+) -> Evaluation:
+    return Evaluation(
+        name="evaluator_name",  # Score name in Langfuse
+        value=0.0,              # Numeric score (typically 0-1)
+        comment="Optional"      # Optional explanation
+    )
+```
+
+### LLM-as-Judge Evaluator
+
+```python
+# llm_judge_evaluators.py
+from langfuse import Evaluation
+
+def llm_judge(*, input, output, expected_output, **kwargs) -> Evaluation:
+    """Use an LLM to evaluate response quality."""
+    from openai import OpenAI
+
+    client = OpenAI()
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "system",
+                "content": """Rate the response quality on a scale of 0-10.
+
+Consider:
+- Accuracy: Does it match the expected answer?
+- Completeness: Does it fully address the question?
+- Clarity: Is it well-written and understandable?
+
+Output only a number 0-10."""
+            },
+            {
+                "role": "user",
+                "content": f"""Question: {input}
+
+Expected Answer: {expected_output}
+
+Actual Response: {output}
+
+Score (0-10):"""
+            }
+        ],
+        temperature=0
+    )
+
+    try:
+        score = float(response.choices[0].message.content.strip()) / 10.0
+        score = max(0.0, min(1.0, score))  # Clamp to 0-1
+    except:
+        score = 0.0
+
+    return Evaluation(name="llm_judge", value=score)
+
+EVALUATORS = [llm_judge]
 ```
 
 ## Common Workflows
 
-### Workflow 1: Validate Config Change
+### Workflow 1: A/B Test Prompts
 
-1. **Make config change** (e.g., add tool to tools.yaml)
-
-2. **Run experiment against regression dataset:**
 ```bash
+# Create dataset if needed
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
+  create --name "prompt-test" --description "Prompt A/B testing"
+
+# Add test items
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
+  add-item --dataset "prompt-test" \
+  --input "What is machine learning?" \
+  --expected-output "Machine learning is..."
+
+# Run with prompt A
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
-  --dataset "case_0001_regressions" \
-  --name "Fix: Add earnings calendar tool" \
-  --metadata '{"change": "added finnhub.calendar_earnings"}'
+  run \
+  --dataset "prompt-test" \
+  --run-name "prompt-a-test" \
+  --task-script ./task_prompt_a.py \
+  --evaluator-script ./evaluators.py
+
+# Run with prompt B
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  run \
+  --dataset "prompt-test" \
+  --run-name "prompt-b-test" \
+  --task-script ./task_prompt_b.py \
+  --evaluator-script ./evaluators.py
+
+# Compare results
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  compare \
+  --dataset "prompt-test" \
+  --runs "prompt-a-test" "prompt-b-test"
 ```
 
-3. **Review results:**
-   - Pass rate >= 80%: Fix is working
-   - Pass rate < 80%: Investigate remaining failures
+### Workflow 2: Regression Testing
 
-### Workflow 2: Before/After Comparison
-
-1. **Run baseline experiment (before changes):**
 ```bash
+# Run baseline
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
-  --dataset "case_0001_regressions" \
-  --name "Baseline - Before Changes" \
-  --metadata '{"version": "baseline"}'
+  run \
+  --dataset "regression-suite" \
+  --run-name "v1.0-baseline" \
+  --task-script ./my_task.py \
+  --evaluator-script ./evaluators.py
+
+# After changes, run new version
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  run \
+  --dataset "regression-suite" \
+  --run-name "v1.1-candidate" \
+  --task-script ./my_task.py \
+  --evaluator-script ./evaluators.py
+
+# Compare to ensure no regressions
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  compare \
+  --dataset "regression-suite" \
+  --runs "v1.0-baseline" "v1.1-candidate"
+
+# Investigate any failures
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  analyze \
+  --dataset "regression-suite" \
+  --run-name "v1.1-candidate" \
+  --show-failures
 ```
 
-2. **Make config changes**
+### Workflow 3: Model Comparison
 
-3. **Run comparison experiment:**
 ```bash
+# Test GPT-4
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
-  --dataset "case_0001_regressions" \
-  --name "After - Fixed Earnings Tool" \
-  --metadata '{"version": "v2"}'
+  run \
+  --dataset "model-eval" \
+  --run-name "gpt4-test" \
+  --task-script ./task_gpt4.py \
+  --evaluator-script ./quality_evaluators.py
+
+# Test Claude
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  run \
+  --dataset "model-eval" \
+  --run-name "claude-test" \
+  --task-script ./task_claude.py \
+  --evaluator-script ./quality_evaluators.py
+
+# Compare results
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  compare \
+  --dataset "model-eval" \
+  --runs "gpt4-test" "claude-test"
 ```
-
-4. **Compare pass rates and avg scores**
-
-### Workflow 3: Full Optimization Cycle
-
-See the **optimization_cycle playbook** for the complete 5-step workflow:
-```
-DETECT → DIAGNOSE → CURATE → FIX → VALIDATE
-```
-
-## Viewing Results in Langfuse
-
-After running an experiment:
-
-1. Go to Langfuse → Datasets → Select dataset
-2. Click "Runs" tab
-3. Find your experiment run by name
-4. View per-item results with linked traces
 
 ## Required Environment Variables
 
-Same as other Langfuse skills, plus writing ecosystem dependencies:
-
 ```bash
-LANGFUSE_PUBLIC_KEY=pk-...
-LANGFUSE_SECRET_KEY=sk-...
-OPENROUTER_API_KEY=...  # For workflow execution
-# Plus any other API keys needed by the case
+LANGFUSE_PUBLIC_KEY=pk-...    # Required
+LANGFUSE_SECRET_KEY=sk-...    # Required
+LANGFUSE_HOST=https://cloud.langfuse.com  # Optional
+
+# For LLM-based evaluators or tasks
+OPENAI_API_KEY=sk-...         # If using OpenAI
+ANTHROPIC_API_KEY=...         # If using Anthropic
 ```
-
-## Performance Notes
-
-- **Concurrency:** Default `max_concurrency=2` to avoid API rate limits
-- **Duration:** Each item runs a full workflow (~10-30s depending on case)
-- **API Costs:** Experiments run real workflows with LLM calls
-
-Recommended dataset sizes:
-- Regression tests: 5-10 items
-- Golden sets: 3-5 items
-- Large tests: 20+ items (use higher concurrency carefully)
 
 ## Troubleshooting
 
-**"Dataset not found":**
-- Verify dataset name matches exactly
-- Use `dataset_manager.py list` to see available datasets
+**Task script not found:**
+- Use absolute path or path relative to current directory
+- Ensure file has `.py` extension
 
-**"Workflow execution failed":**
-- Check API keys are configured
-- Verify case configuration is valid
-- Check Langfuse traces for error details
+**Evaluator not running:**
+- Check that `EVALUATORS` list is defined and exported
+- Verify evaluator functions have correct signature
 
-**Low pass rates after fix:**
-- Review failed item traces
-- May need additional fixes
-- Check if expected scores are realistic
+**Low scores across all items:**
+- Check if expected_output is set in dataset items
+- Review evaluator logic for edge cases
+- Use `--show-failures` to inspect individual items
 
-**Timeout errors:**
-- Reduce `--max-concurrency`
-- Check if specific items are hitting slow APIs
+**Experiment runs slowly:**
+- Reduce `--max-concurrency` if hitting rate limits
+- Check for slow external API calls in task
+- Consider using faster models for evaluation
+
+**No scores in results:**
+- Ensure evaluator returns `Evaluation` objects
+- Check evaluator function signature matches expected kwargs

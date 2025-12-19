@@ -7,12 +7,11 @@ Used by the agent after completing trace analysis.
 
 USAGE:
     python report_generator.py \
-        --symptom "output missing earnings data" \
-        --category research_gap \
+        --symptom "output missing expected data" \
+        --category data_gap \
         --trace-id abc123 \
-        --case-id 0001 \
-        --root-cause "finnhub earnings endpoint not configured" \
-        --evidence "Tool calls: perplexity (1), finnhub.quote (1), finnhub.earnings (0)"
+        --root-cause "API endpoint not called" \
+        --evidence "Tool calls: api_v1 (1), api_v2 (0)"
 
 OUTPUT:
     Structured markdown report to stdout
@@ -28,8 +27,8 @@ def generate_report(
     symptom: str,
     category: str,
     trace_id: str,
-    case_id: Optional[str],
     root_cause: str,
+    project: Optional[str] = None,
     evidence: Optional[str] = None,
     fixes: Optional[List[str]] = None,
 ) -> str:
@@ -37,16 +36,14 @@ def generate_report(
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # Category display names
+    # Category display names (generic categories)
     category_names = {
-        "research_gap": "Research Gap (Missing Data)",
-        "style_mismatch": "Style Mismatch",
-        "tool_selection": "Tool Selection Issue",
+        "data_gap": "Data Gap (Missing Data)",
+        "output_error": "Output Error (Incorrect Result)",
         "execution_error": "Execution Error",
         "latency": "Performance/Latency",
-        "quality_general": "General Quality Issue",
+        "quality_issue": "Quality Issue",
         "cost": "Cost Optimization",
-        "tool_utilization": "Tool Utilization",
     }
 
     category_display = category_names.get(category, category)
@@ -64,9 +61,13 @@ def generate_report(
 | Field | Value |
 |-------|-------|
 | **Trace ID** | `{trace_id}` |
-| **Case ID** | `{case_id or 'Not specified'}` |
 | **Category** | {category_display} |
+"""
 
+    if project:
+        report += f"| **Project** | {project} |\n"
+
+    report += f"""
 ---
 
 ## Root Cause
@@ -112,19 +113,16 @@ def generate_report(
 
 After applying fixes:
 
-1. Re-run workflow:
-   ```bash
-   python run_workflow.py --case {case_id} --topic "..."
-   ```
+1. Re-run your workflow with the same inputs
 
 2. Retrieve new trace:
    ```bash
-   python3 trace_retriever.py --last 1 --case {case_id} --mode io
+   python3 trace_retriever.py --last 1 --mode io
    ```
 
 3. Verify the issue is resolved
 
-""".format(case_id=case_id or "<case_id>")
+"""
 
     report += """---
 
@@ -182,9 +180,8 @@ def main():
         "--category",
         required=True,
         choices=[
-            "research_gap", "style_mismatch", "tool_selection",
-            "execution_error", "latency", "quality_general",
-            "cost", "tool_utilization"
+            "data_gap", "output_error", "execution_error",
+            "latency", "quality_issue", "cost"
         ],
         help="Classified symptom category"
     )
@@ -194,8 +191,8 @@ def main():
         help="Langfuse trace ID"
     )
     parser.add_argument(
-        "--case-id",
-        help="Writing ecosystem case ID"
+        "--project",
+        help="Optional project context for the report"
     )
     parser.add_argument(
         "--root-cause",
@@ -219,8 +216,8 @@ def main():
         symptom=args.symptom,
         category=args.category,
         trace_id=args.trace_id,
-        case_id=args.case_id,
         root_cause=args.root_cause,
+        project=args.project,
         evidence=args.evidence,
         fixes=args.fixes,
     )

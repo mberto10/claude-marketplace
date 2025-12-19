@@ -5,7 +5,7 @@ description: This skill should be used when the user asks to "create dataset", "
 
 # Langfuse Dataset Management
 
-Create and manage regression test datasets from production traces for experiment validation.
+Create and manage regression test datasets from production traces for validation and testing.
 
 ## When to Use
 
@@ -13,16 +13,16 @@ Create and manage regression test datasets from production traces for experiment
 - Building golden test sets from high-quality examples
 - Adding specific traces to existing datasets
 - Listing available datasets and their items
-- Preparing data for experiment validation
+- Preparing data for validation testing
 
 ## Naming Convention
 
-**Recommended format:** `case_{case_id}_{purpose}`
+**Recommended format:** `{project}_{purpose}` or `{workflow}_{purpose}`
 
 Examples:
-- `case_0001_regressions` - Failing traces for German stock analysis
-- `case_0001_golden_set` - High-quality verified outputs
-- `case_0005_edge_cases` - Edge cases for The Prep workflow
+- `checkout_regressions` - Failing traces for checkout flow
+- `api_v2_golden_set` - High-quality verified outputs
+- `auth_edge_cases` - Edge cases for authentication workflow
 
 ## Operations
 
@@ -31,9 +31,9 @@ Examples:
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
   create \
-  --name "case_0001_regressions" \
-  --description "Failing traces for earnings data issue" \
-  --metadata '{"case_id": "0001", "purpose": "regression"}'
+  --name "checkout_regressions" \
+  --description "Failing traces for checkout flow issues" \
+  --metadata '{"project": "checkout", "purpose": "regression"}'
 ```
 
 ### Add Single Trace
@@ -41,9 +41,19 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
   add-trace \
-  --dataset "case_0001_regressions" \
+  --dataset "checkout_regressions" \
   --trace-id abc123def456 \
   --expected-score 9.0
+```
+
+### Add with Custom Expected Output
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
+  add-trace \
+  --dataset "checkout_regressions" \
+  --trace-id abc123def456 \
+  --expected-output '{"min_score": 9.0, "required_fields": ["summary", "recommendations"]}'
 ```
 
 ### Add Multiple Traces (Batch)
@@ -56,7 +66,7 @@ trace_id_3" > failing_traces.txt
 
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
   add-batch \
-  --dataset "case_0001_regressions" \
+  --dataset "checkout_regressions" \
   --trace-file failing_traces.txt \
   --expected-score 9.0
 ```
@@ -72,7 +82,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
   get \
-  --name "case_0001_regressions"
+  --name "checkout_regressions"
 ```
 
 ## Dataset Item Structure
@@ -80,20 +90,20 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.
 When adding a trace to a dataset, the tool extracts:
 
 **Input** (from trace):
-```json
-{
-  "case_id": "0001",
-  "ticker": "MSFT",
-  "topic": "Microsoft Stock Analysis",
-  "brief": {...}
-}
-```
+The trace's input data merged with its metadata. All fields from the original trace are preserved.
 
 **Expected Output** (from arguments):
 ```json
 {
-  "min_quality_score": 9.0,
-  "min_word_count": 800
+  "min_score": 9.0
+}
+```
+
+Or custom expectations:
+```json
+{
+  "min_score": 8.5,
+  "required_fields": ["summary", "recommendations"]
 }
 ```
 
@@ -101,7 +111,7 @@ When adding a trace to a dataset, the tool extracts:
 ```json
 {
   "source_trace_id": "abc123",
-  "added_date": "2025-12-06",
+  "added_date": "2025-12-19",
   "original_score": 6.2
 }
 ```
@@ -113,15 +123,15 @@ When adding a trace to a dataset, the tool extracts:
 1. **Find failing traces** (using data-retrieval skill):
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
-  --last 20 --case 0001 --max-score 7.0 --mode minimal
+  --last 20 --max-score 7.0 --mode minimal
 ```
 
 2. **Create dataset**:
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
   create \
-  --name "case_0001_regressions" \
-  --description "Failing traces for earnings calendar fix"
+  --name "checkout_regressions" \
+  --description "Failing traces for checkout fixes"
 ```
 
 3. **Extract trace IDs** (from step 1 output) and save to file
@@ -130,7 +140,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
   add-batch \
-  --dataset "case_0001_regressions" \
+  --dataset "checkout_regressions" \
   --trace-file failing_ids.txt \
   --expected-score 9.0
 ```
@@ -140,14 +150,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.
 1. **Find high-quality traces**:
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
-  --last 10 --case 0001 --min-score 9.0 --mode minimal
+  --last 10 --min-score 9.0 --mode minimal
 ```
 
 2. **Create golden set dataset**:
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
   create \
-  --name "case_0001_golden_set" \
+  --name "api_golden_set" \
   --description "Verified high-quality outputs for baseline"
 ```
 
@@ -155,7 +165,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
   add-batch \
-  --dataset "case_0001_golden_set" \
+  --dataset "api_golden_set" \
   --trace-file golden_ids.txt \
   --expected-score 9.0
 ```
@@ -165,13 +175,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.
 When you identify a specific failure during investigation:
 
 ```bash
-# Add the trace directly
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
   add-trace \
-  --dataset "case_0001_regressions" \
+  --dataset "checkout_regressions" \
   --trace-id problematic_trace_id_here \
   --expected-score 9.0 \
-  --failure-reason "Missing earnings calendar data"
+  --failure-reason "Payment processing timeout"
 ```
 
 ## Required Environment Variables
@@ -184,16 +193,6 @@ LANGFUSE_SECRET_KEY=sk-...    # Required
 LANGFUSE_HOST=https://cloud.langfuse.com  # Optional
 ```
 
-## Integration with Experiment Runner
-
-After creating a dataset, use the experiment-runner skill to validate fixes:
-
-```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
-  --dataset "case_0001_regressions" \
-  --name "Fix: Add earnings calendar tool"
-```
-
 ## Troubleshooting
 
 **Dataset already exists:**
@@ -202,10 +201,6 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner
 **Trace not found:**
 - Verify trace ID is correct
 - Check that trace is within the retention period
-
-**Missing input fields:**
-- Some traces may have incomplete metadata
-- The tool will use available fields and warn about missing ones
 
 **Rate limiting:**
 - When adding many traces, the tool may hit API rate limits

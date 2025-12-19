@@ -13,10 +13,10 @@ COMMANDS:
     get         Get items from a dataset
 
 EXAMPLES:
-    python dataset_manager.py create --name "case_0001_regressions" --description "Failing traces"
-    python dataset_manager.py add-trace --dataset "case_0001_regressions" --trace-id abc123 --expected-score 9.0
+    python dataset_manager.py create --name "checkout_regressions" --description "Failing traces"
+    python dataset_manager.py add-trace --dataset "checkout_regressions" --trace-id abc123 --expected-score 9.0
     python dataset_manager.py list
-    python dataset_manager.py get --name "case_0001_regressions"
+    python dataset_manager.py get --name "checkout_regressions"
 """
 
 import argparse
@@ -44,7 +44,7 @@ def create_dataset(
     Create a new Langfuse dataset.
 
     Args:
-        name: Dataset name (recommend: case_{id}_{purpose})
+        name: Dataset name (recommend: {project}_{purpose} e.g., checkout_regressions)
         description: Human-readable description
         metadata: Additional metadata dict
 
@@ -77,7 +77,8 @@ def get_trace_input(trace_id: str) -> Optional[Dict[str, Any]]:
     """
     Fetch trace and extract input data for dataset item.
 
-    Returns dict with case_id, ticker, topic, brief, etc. from trace input/metadata.
+    Returns the trace input merged with metadata. All fields from the original
+    trace are preserved for maximum flexibility.
     """
     client = get_langfuse_client()
 
@@ -88,39 +89,14 @@ def get_trace_input(trace_id: str) -> Optional[Dict[str, Any]]:
 
         trace_dict = trace.dict() if hasattr(trace, "dict") else dict(trace)
 
-        # Extract input data - combine trace input and metadata
+        # Get trace input and metadata
         trace_input = trace_dict.get("input") or {}
         metadata = trace_dict.get("metadata") or {}
 
-        # Build dataset item input
-        item_input = {}
+        # Merge metadata into input (trace_input takes precedence)
+        item_input = {**metadata, **trace_input}
 
-        # Try to get case_id
-        if "case_id" in trace_input:
-            item_input["case_id"] = trace_input["case_id"]
-        elif "case_id" in metadata:
-            item_input["case_id"] = metadata["case_id"]
-
-        # Try to get ticker/symbol
-        for key in ["ticker", "symbol"]:
-            if key in trace_input:
-                item_input["ticker"] = trace_input[key]
-                break
-            if key in metadata:
-                item_input["ticker"] = metadata[key]
-                break
-
-        # Try to get topic
-        if "topic" in trace_input:
-            item_input["topic"] = trace_input["topic"]
-        elif "topic" in metadata:
-            item_input["topic"] = metadata["topic"]
-
-        # Include brief if available
-        if "brief" in trace_input:
-            item_input["brief"] = trace_input["brief"]
-
-        # Store original trace input for reference
+        # Store original for reference if there was input
         if trace_input:
             item_input["_original_input"] = trace_input
 
@@ -149,8 +125,8 @@ def get_trace_score(trace_id: str, score_name: str = "quality_score") -> Optiona
 def add_trace_to_dataset(
     dataset_name: str,
     trace_id: str,
-    expected_score: float = 9.0,
-    expected_word_count: int = 800,
+    expected_score: Optional[float] = None,
+    expected_output: Optional[Dict[str, Any]] = None,
     failure_reason: Optional[str] = None
 ) -> Dict[str, Any]:
     """
@@ -159,8 +135,8 @@ def add_trace_to_dataset(
     Args:
         dataset_name: Target dataset name
         trace_id: Source trace ID
-        expected_score: Minimum expected quality score
-        expected_word_count: Minimum expected word count
+        expected_score: Convenience arg for min_score in expected output
+        expected_output: Custom expected output dict (overrides expected_score)
         failure_reason: Optional reason why this trace was added (for regressions)
 
     Returns:
@@ -181,10 +157,9 @@ def add_trace_to_dataset(
     original_score = get_trace_score(trace_id)
 
     # Build expected output
-    expected_output = {
-        "min_quality_score": expected_score,
-        "min_word_count": expected_word_count
-    }
+    final_expected_output = expected_output or {}
+    if expected_score is not None and "min_score" not in final_expected_output:
+        final_expected_output["min_score"] = expected_score
 
     # Build metadata
     item_metadata = {
@@ -200,7 +175,7 @@ def add_trace_to_dataset(
         item = client.create_dataset_item(
             dataset_name=dataset_name,
             input=trace_input,
-            expected_output=expected_output,
+            expected_output=final_expected_output,
             source_trace_id=trace_id,
             metadata=item_metadata
         )
@@ -210,7 +185,7 @@ def add_trace_to_dataset(
             "dataset": dataset_name,
             "item_id": item.id if hasattr(item, "id") else None,
             "status": "added",
-            "input_fields": list(trace_input.keys()),
+            "input_fields": [k for k in trace_input.keys() if not k.startswith("_")],
             "original_score": original_score
         }
     except Exception as e:
@@ -224,8 +199,8 @@ def add_trace_to_dataset(
 def add_batch_from_file(
     dataset_name: str,
     trace_file: str,
-    expected_score: float = 9.0,
-    expected_word_count: int = 800
+    expected_score: Optional[float] = None,
+    expected_output: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Add multiple traces from a file (one trace ID per line).
@@ -254,7 +229,7 @@ def add_batch_from_file(
             dataset_name=dataset_name,
             trace_id=trace_id,
             expected_score=expected_score,
-            expected_word_count=expected_word_count
+            expected_output=expected_output
         )
         results["items"].append(result)
         if result.get("status") == "added":
@@ -447,21 +422,28 @@ def format_get_result(result: Dict[str, Any]) -> str:
         lines.append(f"## Item {i}")
         lines.append("")
 
-        # Input summary
+        # Input summary - show first few non-internal fields
         input_data = item.get("input", {})
-        case_id = input_data.get("case_id", "-")
-        ticker = input_data.get("ticker", "-")
-        topic = input_data.get("topic", "-")
+        display_fields = {k: v for k, v in input_data.items() if not k.startswith("_")}
 
-        lines.append(f"**Case:** {case_id} | **Ticker:** {ticker}")
-        if topic != "-":
-            lines.append(f"**Topic:** {topic[:60]}...")
+        # Show up to 5 key fields
+        for key, value in list(display_fields.items())[:5]:
+            if isinstance(value, str) and len(value) > 60:
+                value = value[:60] + "..."
+            elif isinstance(value, dict):
+                value = f"{{...}} ({len(value)} keys)"
+            elif isinstance(value, list):
+                value = f"[...] ({len(value)} items)"
+            lines.append(f"**{key}:** {value}")
+
+        if len(display_fields) > 5:
+            lines.append(f"_...and {len(display_fields) - 5} more fields_")
 
         # Expected output
         expected = item.get("expected_output", {})
-        min_score = expected.get("min_quality_score", "-")
-        min_words = expected.get("min_word_count", "-")
-        lines.append(f"**Expected:** score >= {min_score}, words >= {min_words}")
+        if expected:
+            exp_str = ", ".join(f"{k}={v}" for k, v in expected.items())
+            lines.append(f"**Expected:** {exp_str}")
 
         # Metadata
         metadata = item.get("metadata", {})
@@ -495,11 +477,11 @@ Commands:
   get         Get items from a dataset
 
 Examples:
-  %(prog)s create --name "case_0001_regressions" --description "Failing traces"
-  %(prog)s add-trace --dataset "case_0001_regressions" --trace-id abc123
-  %(prog)s add-batch --dataset "case_0001_regressions" --trace-file ids.txt
+  %(prog)s create --name "checkout_regressions" --description "Failing traces"
+  %(prog)s add-trace --dataset "checkout_regressions" --trace-id abc123 --expected-score 9.0
+  %(prog)s add-batch --dataset "checkout_regressions" --trace-file ids.txt
   %(prog)s list
-  %(prog)s get --name "case_0001_regressions"
+  %(prog)s get --name "checkout_regressions"
         """
     )
 
@@ -522,14 +504,12 @@ Examples:
     add_parser.add_argument(
         "--expected-score",
         type=float,
-        default=9.0,
-        help="Expected minimum quality score (default: 9.0)"
+        help="Expected minimum score (convenience arg, sets min_score in expected output)"
     )
     add_parser.add_argument(
-        "--expected-word-count",
-        type=int,
-        default=800,
-        help="Expected minimum word count (default: 800)"
+        "--expected-output",
+        type=json.loads,
+        help="Custom expected output as JSON (e.g., '{\"min_score\": 9.0, \"required_fields\": [\"summary\"]}')"
     )
     add_parser.add_argument(
         "--failure-reason",
@@ -543,14 +523,12 @@ Examples:
     batch_parser.add_argument(
         "--expected-score",
         type=float,
-        default=9.0,
-        help="Expected minimum quality score (default: 9.0)"
+        help="Expected minimum score (convenience arg, sets min_score in expected output)"
     )
     batch_parser.add_argument(
-        "--expected-word-count",
-        type=int,
-        default=800,
-        help="Expected minimum word count (default: 800)"
+        "--expected-output",
+        type=json.loads,
+        help="Custom expected output as JSON"
     )
 
     # list subcommand
@@ -576,7 +554,7 @@ Examples:
             dataset_name=args.dataset,
             trace_id=args.trace_id,
             expected_score=args.expected_score,
-            expected_word_count=args.expected_word_count,
+            expected_output=args.expected_output,
             failure_reason=args.failure_reason
         )
         print(format_add_result(result))
@@ -586,7 +564,7 @@ Examples:
             dataset_name=args.dataset,
             trace_file=args.trace_file,
             expected_score=args.expected_score,
-            expected_word_count=args.expected_word_count
+            expected_output=args.expected_output
         )
         print(format_batch_result(result))
 

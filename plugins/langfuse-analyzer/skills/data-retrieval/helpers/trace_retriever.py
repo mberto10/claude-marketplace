@@ -126,7 +126,8 @@ def get_trace_score(trace_id: str, score_name: str) -> Optional[float]:
 
 def retrieve_last_traces(
     limit: int = 1,
-    case_id: Optional[str] = None,
+    filter_field: Optional[str] = None,
+    filter_value: Optional[str] = None,
     tags: Optional[List[str]] = None,
     days: int = 7,
     min_score: Optional[float] = None,
@@ -138,7 +139,8 @@ def retrieve_last_traces(
 
     Args:
         limit: Maximum number of traces to return
-        case_id: Filter by case_id in metadata
+        filter_field: Metadata field name to filter by (e.g., 'project_id', 'environment')
+        filter_value: Value to match for filter_field
         tags: Filter by tags
         days: Look back N days
         min_score: Only include traces with score >= this value
@@ -168,10 +170,10 @@ def retrieve_last_traces(
             for trace in response.data:
                 trace_dict = trace.dict() if hasattr(trace, "dict") else dict(trace)
 
-                # Filter by case_id if specified (client-side filter)
-                if case_id:
+                # Filter by metadata field if specified (client-side filter)
+                if filter_field and filter_value:
                     metadata = trace_dict.get("metadata", {}) or {}
-                    if metadata.get("case_id") != case_id:
+                    if str(metadata.get(filter_field)) != str(filter_value):
                         continue
 
                 # Filter by score if specified (client-side filter)
@@ -481,12 +483,16 @@ Score Filtering:
   --min-score 8.5        Find high-quality traces (score >= 8.5)
   --score-name NAME      Filter by specific score (default: quality_score)
 
+Metadata Filtering:
+  --filter-field NAME    Filter by any metadata field
+  --filter-value VALUE   Value to match for the field
+
 Examples:
   %(prog)s --last 2
   %(prog)s --trace-id abc123 --mode prompts
-  %(prog)s --last 5 --case 0001 --mode flow
-  %(prog)s --last 20 --case 0001 --max-score 7.0 --mode minimal  # Find failures
-  %(prog)s --last 10 --min-score 9.0 --mode minimal              # Find successes
+  %(prog)s --last 5 --filter-field project_id --filter-value myproject --mode flow
+  %(prog)s --last 20 --filter-field environment --filter-value production --max-score 7.0 --mode minimal
+  %(prog)s --last 10 --min-score 9.0 --mode minimal
         """
     )
 
@@ -505,8 +511,12 @@ Examples:
 
     # Filters
     parser.add_argument(
-        "--case",
-        help="Filter by case_id metadata"
+        "--filter-field",
+        help="Metadata field name to filter by (e.g., 'project_id', 'environment')"
+    )
+    parser.add_argument(
+        "--filter-value",
+        help="Value to match for --filter-field"
     )
     parser.add_argument(
         "--tags",
@@ -557,7 +567,8 @@ Examples:
     else:
         traces = retrieve_last_traces(
             limit=args.last,
-            case_id=args.case,
+            filter_field=args.filter_field,
+            filter_value=args.filter_value,
             tags=args.tags,
             days=args.days,
             min_score=args.min_score,

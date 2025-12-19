@@ -2,599 +2,608 @@
 """
 Langfuse Experiment Runner
 
-Execute writing ecosystem workflows against datasets with automatic tracing
-and evaluation. Used for validating config changes and regression testing.
+Run experiments on datasets with custom evaluators and analyze results.
 
 USAGE:
-    python experiment_runner.py --dataset "case_0001_regressions" --name "Fix: Add earnings tool"
-    python experiment_runner.py --dataset "case_0001_regressions" --name "Test" --max-concurrency 2
-
-EVALUATORS:
-    quality_score  - Compares output quality_score to expected minimum
-    word_count     - Validates minimum word count from article
-
-OUTPUT:
-    Markdown report with summary stats, per-item results, and failed items.
+    python experiment_runner.py run --dataset "my-tests" --run-name "v1" --task-script task.py
+    python experiment_runner.py list-runs --dataset "my-tests"
+    python experiment_runner.py get-run --dataset "my-tests" --run-name "v1"
+    python experiment_runner.py compare --dataset "my-tests" --runs "v1" "v2"
+    python experiment_runner.py analyze --dataset "my-tests" --run-name "v1" --show-failures
 """
 
 import argparse
+import importlib.util
 import json
 import sys
-import time
-import traceback
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Optional, List, Dict, Any, Callable
+from datetime import datetime
 
-# Add paths for imports
-plugin_root = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(plugin_root / "skills" / "data-retrieval" / "helpers"))
-
-# Add writing_ecosystem to path
-workspace_root = plugin_root.parent.parent.parent
-writing_ecosystem_path = workspace_root / "writing_ecosystem"
-sys.path.insert(0, str(writing_ecosystem_path))
-
+# Add parent directories to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "data-retrieval" / "helpers"))
 from langfuse_client import get_langfuse_client
 
-# Try to import Langfuse Evaluation for proper evaluator pattern
-try:
-    from langfuse import Evaluation
-except ImportError:
-    # Fallback if not available
-    class Evaluation:
-        def __init__(self, name: str, value: float, comment: str = "", metadata: Optional[Dict] = None):
-            self.name = name
-            self.value = value
-            self.comment = comment
-            self.metadata = metadata or {}
+
+def load_module_from_path(script_path: str, module_name: str):
+    """Load a Python module from a file path."""
+    path = Path(script_path).resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"Script not found: {script_path}")
+
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load module from: {script_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
-# =============================================================================
-# EVALUATORS
-# =============================================================================
+def load_task(task_script_path: str) -> Callable:
+    """Load task function from a script file.
 
-def evaluator_quality_score(
-    *,
-    input: Dict[str, Any],
-    output: Dict[str, Any],
-    expected_output: Optional[Dict[str, Any]] = None,
-    **kwargs
-) -> Evaluation:
+    The script must define a `task` function with signature:
+        def task(*, item, **kwargs) -> Any
     """
-    Evaluates if output quality_score meets expected minimum.
+    module = load_module_from_path(task_script_path, "task_module")
 
-    Args:
-        input: Dataset item input (case_id, ticker, topic, brief)
-        output: Workflow result (final_article, quality_score, etc.)
-        expected_output: Expected minimums (min_quality_score)
+    if not hasattr(module, "task"):
+        raise AttributeError(f"Script must define a 'task' function: {task_script_path}")
 
-    Returns:
-        Evaluation with pass/fail and score details
+    return module.task
+
+
+def load_evaluators(evaluator_script_path: str) -> List[Callable]:
+    """Load evaluator functions from a script file.
+
+    The script must define EVALUATORS list or individual evaluator functions.
+    Each evaluator function should have signature:
+        def evaluator(*, output, expected_output, **kwargs) -> Evaluation
     """
-    # Extract actual score - try multiple possible locations
-    actual_score = None
-    if isinstance(output, dict):
-        actual_score = output.get("quality_score") or output.get("validation_score")
-        # Try nested locations
-        if actual_score is None and "validation_report" in output:
-            report = output["validation_report"]
-            if isinstance(report, dict):
-                actual_score = report.get("overall_score")
+    module = load_module_from_path(evaluator_script_path, "evaluator_module")
 
-    if actual_score is None:
-        actual_score = 0.0
+    # Check for EVALUATORS list first
+    if hasattr(module, "EVALUATORS"):
+        evaluators = module.EVALUATORS
+        if isinstance(evaluators, list):
+            return evaluators
 
-    # Get expected minimum
-    expected_min = 9.0  # Default
-    if expected_output:
-        expected_min = expected_output.get("min_quality_score", 9.0)
+    # Fall back to finding all functions that look like evaluators
+    evaluators = []
+    for name in dir(module):
+        if name.startswith("_"):
+            continue
+        obj = getattr(module, name)
+        if callable(obj) and name not in ("task", "load_module_from_path"):
+            evaluators.append(obj)
 
-    # Evaluate
-    passed = actual_score >= expected_min
-    value = 1.0 if passed else 0.0
+    if not evaluators:
+        raise AttributeError(
+            f"Script must define EVALUATORS list or evaluator functions: {evaluator_script_path}"
+        )
 
-    comment = f"Score: {actual_score:.1f} (expected >= {expected_min:.1f})"
-    if not passed:
-        comment += f" - FAILED by {expected_min - actual_score:.1f}"
-
-    return Evaluation(
-        name="quality_score",
-        value=value,
-        comment=comment,
-        metadata={
-            "actual": actual_score,
-            "expected_min": expected_min,
-            "delta": actual_score - expected_min
-        }
-    )
-
-
-def evaluator_word_count(
-    *,
-    input: Dict[str, Any],
-    output: Dict[str, Any],
-    expected_output: Optional[Dict[str, Any]] = None,
-    **kwargs
-) -> Evaluation:
-    """
-    Evaluates if output meets minimum word count.
-
-    Args:
-        input: Dataset item input
-        output: Workflow result
-        expected_output: Expected minimums (min_word_count)
-
-    Returns:
-        Evaluation with pass/fail and word count details
-    """
-    # Extract article text
-    article = ""
-    if isinstance(output, dict):
-        article = output.get("final_article") or output.get("draft") or ""
-
-    word_count = len(article.split()) if article else 0
-
-    # Get expected minimum
-    expected_min = 800  # Default
-    if expected_output:
-        expected_min = expected_output.get("min_word_count", 800)
-
-    # Evaluate
-    passed = word_count >= expected_min
-    value = 1.0 if passed else 0.0
-
-    comment = f"Words: {word_count} (expected >= {expected_min})"
-    if not passed:
-        comment += f" - FAILED by {expected_min - word_count}"
-
-    return Evaluation(
-        name="word_count",
-        value=value,
-        comment=comment,
-        metadata={
-            "actual": word_count,
-            "expected_min": expected_min,
-            "delta": word_count - expected_min
-        }
-    )
-
-
-# Map evaluator names to functions
-EVALUATORS = {
-    "quality_score": evaluator_quality_score,
-    "word_count": evaluator_word_count,
-}
-
-
-# =============================================================================
-# WORKFLOW EXECUTION
-# =============================================================================
-
-def run_workflow_for_item(
-    item_input: Dict[str, Any],
-    run_name: str,
-    dataset_name: str,
-    item_id: str
-) -> Dict[str, Any]:
-    """
-    Execute writing workflow for a single dataset item.
-
-    Uses direct integration with build_workflow + LangfuseTracer for proper tracing.
-    """
-    try:
-        # Import workflow components
-        from workflows.main_graph_v2 import build_workflow
-        from tracing.langfuse_tracer import LangfuseTracer
-
-        # Build workflow
-        workflow = build_workflow()
-        tracer = LangfuseTracer()
-
-        # Prepare input state
-        state = dict(item_input)
-
-        # Ensure required fields
-        if "_original_input" in state:
-            # Merge original input
-            original = state.pop("_original_input")
-            for key, value in original.items():
-                if key not in state:
-                    state[key] = value
-
-        # Run with tracing
-        start_time = time.time()
-
-        with tracer.trace_workflow(
-            name=f"experiment:{run_name}",
-            input_data=state,
-            user_id="experiment-runner",
-            session_id=f"exp-{run_name}-{item_id[:8]}",
-            tags=["experiment", f"dataset:{dataset_name}", f"run:{run_name}"]
-        ):
-            result = workflow.invoke(state)
-            tracer.update_trace_output(result)
-
-        duration = time.time() - start_time
-
-        # Flush to ensure trace is sent
-        tracer.flush()
-
-        # Extract trace ID if available
-        trace_id = tracer.trace_id
-
-        return {
-            "success": True,
-            "output": result,
-            "trace_id": trace_id,
-            "duration": duration
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "output": {},
-            "error": str(e),
-            "traceback": traceback.format_exc(),
-            "duration": 0
-        }
+    return evaluators
 
 
 def run_experiment(
     dataset_name: str,
     run_name: str,
-    description: Optional[str] = None,
-    evaluator_names: List[str] = None,
-    max_concurrency: int = 2,
+    task_script: str,
+    evaluator_script: Optional[str] = None,
+    max_concurrency: int = 5,
+    run_description: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """
-    Run experiment against a Langfuse dataset.
-
-    Note: Currently runs sequentially. For parallel execution, consider using
-    Langfuse's native run_experiment() method when available.
-
-    Args:
-        dataset_name: Name of the dataset to run against
-        run_name: Name for this experiment run
-        description: Optional description
-        evaluator_names: List of evaluator names to apply
-        max_concurrency: Max parallel items (not yet implemented, runs sequential)
-        metadata: Additional metadata for the run
-
-    Returns:
-        Experiment results dict
-    """
+    """Run an experiment on a dataset with custom task and evaluators."""
     client = get_langfuse_client()
 
-    # Get evaluator functions
-    if evaluator_names is None:
-        evaluator_names = ["quality_score", "word_count"]
-
-    evaluators = [EVALUATORS[name] for name in evaluator_names if name in EVALUATORS]
-
-    # Load dataset
     try:
+        # Load task function
+        task_fn = load_task(task_script)
+
+        # Load evaluators if provided
+        evaluators = []
+        if evaluator_script:
+            evaluators = load_evaluators(evaluator_script)
+
+        # Get dataset
         dataset = client.get_dataset(dataset_name)
-    except Exception as e:
-        return {"error": f"Could not load dataset '{dataset_name}': {e}"}
+        if not dataset:
+            print(f"Dataset '{dataset_name}' not found", file=sys.stderr)
+            return {"status": "error", "message": f"Dataset not found: {dataset_name}"}
 
-    items = list(dataset.items)
-    if not items:
-        return {"error": f"Dataset '{dataset_name}' has no items"}
+        # Prepare run metadata
+        run_metadata = metadata or {}
+        run_metadata["task_script"] = task_script
+        if evaluator_script:
+            run_metadata["evaluator_script"] = evaluator_script
+        run_metadata["max_concurrency"] = max_concurrency
 
-    # Initialize results
-    results = {
-        "dataset_name": dataset_name,
-        "run_name": run_name,
-        "description": description,
-        "metadata": metadata or {},
-        "started_at": datetime.now().isoformat(),
-        "total_items": len(items),
-        "processed": 0,
-        "passed": 0,
-        "failed": 0,
-        "errors": 0,
-        "items": [],
-        "total_duration": 0
-    }
-
-    start_time = time.time()
-
-    # Process each item (sequential for now)
-    for i, item in enumerate(items):
-        item_dict = item.dict() if hasattr(item, "dict") else dict(item)
-        item_id = item_dict.get("id", f"item_{i}")
-        item_input = item_dict.get("input", {})
-        expected_output = item_dict.get("expected_output", {})
-        item_metadata = item_dict.get("metadata", {})
-
-        print(f"Processing item {i+1}/{len(items)}: {item_id[:12]}...", file=sys.stderr)
-
-        # Run workflow
-        execution_result = run_workflow_for_item(
-            item_input=item_input,
-            run_name=run_name,
-            dataset_name=dataset_name,
-            item_id=item_id
+        # Run experiment using Langfuse SDK
+        results = dataset.run_experiment(
+            name=run_name,
+            run_description=run_description,
+            run_metadata=run_metadata,
+            experiment_task=task_fn,
+            evaluators=evaluators if evaluators else None,
+            max_concurrency=max_concurrency
         )
 
-        item_result = {
-            "item_id": item_id,
-            "input_summary": {
-                "case_id": item_input.get("case_id"),
-                "ticker": item_input.get("ticker"),
-                "topic": (item_input.get("topic") or "")[:50]
-            },
-            "execution": {
-                "success": execution_result.get("success", False),
-                "duration": execution_result.get("duration", 0),
-                "trace_id": execution_result.get("trace_id"),
-                "error": execution_result.get("error")
-            },
-            "evaluations": [],
-            "passed": True
+        # Collect summary statistics
+        total_items = 0
+        successful = 0
+        failed = 0
+        scores = {}
+
+        for item_result in results:
+            total_items += 1
+            if hasattr(item_result, 'error') and item_result.error:
+                failed += 1
+            else:
+                successful += 1
+
+            # Aggregate scores
+            if hasattr(item_result, 'scores') and item_result.scores:
+                for score in item_result.scores:
+                    name = score.name if hasattr(score, 'name') else str(score)
+                    value = score.value if hasattr(score, 'value') else score
+                    if name not in scores:
+                        scores[name] = []
+                    if isinstance(value, (int, float)):
+                        scores[name].append(value)
+
+        # Calculate averages
+        score_averages = {}
+        for name, values in scores.items():
+            if values:
+                score_averages[name] = sum(values) / len(values)
+
+        return {
+            "status": "completed",
+            "dataset": dataset_name,
+            "run_name": run_name,
+            "total_items": total_items,
+            "successful": successful,
+            "failed": failed,
+            "score_averages": score_averages,
+            "evaluators_used": [e.__name__ for e in evaluators] if evaluators else []
         }
 
-        if execution_result.get("success"):
-            output = execution_result.get("output", {})
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return {"status": "error", "message": str(e)}
+    except Exception as e:
+        print(f"Error running experiment: {e}", file=sys.stderr)
+        return {"status": "error", "message": str(e)}
 
-            # Run evaluators
-            for evaluator in evaluators:
-                try:
-                    evaluation = evaluator(
-                        input=item_input,
-                        output=output,
-                        expected_output=expected_output,
-                        metadata=item_metadata
-                    )
-                    eval_result = {
-                        "name": evaluation.name,
-                        "value": evaluation.value,
-                        "comment": evaluation.comment,
-                        "passed": evaluation.value >= 0.5
-                    }
-                    item_result["evaluations"].append(eval_result)
 
-                    if not eval_result["passed"]:
-                        item_result["passed"] = False
-                except Exception as e:
-                    item_result["evaluations"].append({
-                        "name": evaluator.__name__,
-                        "value": 0,
-                        "comment": f"Evaluator error: {e}",
-                        "passed": False
-                    })
-                    item_result["passed"] = False
+def list_runs(dataset_name: str) -> List[Dict[str, Any]]:
+    """List all experiment runs for a dataset."""
+    client = get_langfuse_client()
+
+    try:
+        dataset = client.get_dataset(dataset_name)
+        if not dataset:
+            print(f"Dataset '{dataset_name}' not found", file=sys.stderr)
+            return []
+
+        runs = []
+        if hasattr(dataset, 'runs') and dataset.runs:
+            for run in dataset.runs:
+                run_dict = {
+                    "name": run.name if hasattr(run, 'name') else str(run),
+                    "created_at": str(run.created_at) if hasattr(run, 'created_at') else None,
+                    "description": run.description if hasattr(run, 'description') else None,
+                    "metadata": run.metadata if hasattr(run, 'metadata') else {}
+                }
+                runs.append(run_dict)
+
+        return runs
+    except Exception as e:
+        print(f"Error listing runs: {e}", file=sys.stderr)
+        return []
+
+
+def get_run(dataset_name: str, run_name: str) -> Optional[Dict[str, Any]]:
+    """Get details of a specific experiment run."""
+    client = get_langfuse_client()
+
+    try:
+        dataset = client.get_dataset(dataset_name)
+        if not dataset:
+            print(f"Dataset '{dataset_name}' not found", file=sys.stderr)
+            return None
+
+        # Find the run
+        run = None
+        if hasattr(dataset, 'runs') and dataset.runs:
+            for r in dataset.runs:
+                if hasattr(r, 'name') and r.name == run_name:
+                    run = r
+                    break
+
+        if not run:
+            print(f"Run '{run_name}' not found in dataset '{dataset_name}'", file=sys.stderr)
+            return None
+
+        # Get run items with their scores
+        items = []
+        scores_summary = {}
+
+        if hasattr(run, 'items') and run.items:
+            for item in run.items:
+                item_dict = {
+                    "id": item.id if hasattr(item, 'id') else None,
+                    "input": item.input if hasattr(item, 'input') else None,
+                    "output": item.output if hasattr(item, 'output') else None,
+                    "expected_output": item.expected_output if hasattr(item, 'expected_output') else None,
+                }
+
+                # Get scores for this item
+                if hasattr(item, 'scores') and item.scores:
+                    item_dict["scores"] = {}
+                    for score in item.scores:
+                        name = score.name if hasattr(score, 'name') else "score"
+                        value = score.value if hasattr(score, 'value') else score
+                        item_dict["scores"][name] = value
+
+                        if name not in scores_summary:
+                            scores_summary[name] = []
+                        if isinstance(value, (int, float)):
+                            scores_summary[name].append(value)
+
+                items.append(item_dict)
+
+        # Calculate score statistics
+        score_stats = {}
+        for name, values in scores_summary.items():
+            if values:
+                score_stats[name] = {
+                    "mean": sum(values) / len(values),
+                    "min": min(values),
+                    "max": max(values),
+                    "count": len(values)
+                }
+
+        return {
+            "name": run_name,
+            "dataset": dataset_name,
+            "created_at": str(run.created_at) if hasattr(run, 'created_at') else None,
+            "description": run.description if hasattr(run, 'description') else None,
+            "metadata": run.metadata if hasattr(run, 'metadata') else {},
+            "item_count": len(items),
+            "score_stats": score_stats,
+            "items": items
+        }
+
+    except Exception as e:
+        print(f"Error getting run: {e}", file=sys.stderr)
+        return None
+
+
+def compare_runs(dataset_name: str, run_names: List[str]) -> str:
+    """Compare multiple experiment runs."""
+    runs_data = []
+
+    for run_name in run_names:
+        run = get_run(dataset_name, run_name)
+        if run:
+            runs_data.append(run)
         else:
-            item_result["passed"] = False
-            results["errors"] += 1
+            return f"Error: Run '{run_name}' not found"
 
-        results["items"].append(item_result)
-        results["processed"] += 1
+    if len(runs_data) < 2:
+        return "Error: Need at least 2 runs to compare"
 
-        if item_result["passed"]:
-            results["passed"] += 1
-        else:
-            results["failed"] += 1
-
-    results["total_duration"] = time.time() - start_time
-    results["finished_at"] = datetime.now().isoformat()
-    results["pass_rate"] = results["passed"] / results["total_items"] if results["total_items"] > 0 else 0
-
-    # Calculate average score
-    quality_scores = []
-    for item in results["items"]:
-        for eval_result in item.get("evaluations", []):
-            if eval_result.get("name") == "quality_score":
-                # Extract actual score from comment
-                comment = eval_result.get("comment", "")
-                if "Score:" in comment:
-                    try:
-                        score_str = comment.split("Score:")[1].split()[0]
-                        quality_scores.append(float(score_str))
-                    except:
-                        pass
-
-    results["avg_quality_score"] = sum(quality_scores) / len(quality_scores) if quality_scores else None
-
-    return results
-
-
-# =============================================================================
-# OUTPUT FORMATTING
-# =============================================================================
-
-def format_experiment_report(results: Dict[str, Any]) -> str:
-    """Format experiment results as markdown report."""
-    lines = []
-
-    if "error" in results:
-        lines.append("# Experiment Error")
-        lines.append("")
-        lines.append(f"**Error:** {results['error']}")
-        return "\n".join(lines)
+    # Build comparison table
+    lines = [f"# Run Comparison: {dataset_name}\n"]
 
     # Header
-    lines.append(f"# Experiment Results: {results.get('run_name', 'Unknown')}")
-    lines.append("")
-    lines.append(f"**Dataset:** `{results.get('dataset_name')}`")
-    lines.append(f"**Items:** {results.get('total_items', 0)}")
-    if results.get("description"):
-        lines.append(f"**Description:** {results['description']}")
-    lines.append("")
+    header = "| Metric |"
+    separator = "|--------|"
+    for run in runs_data:
+        header += f" {run['name']} |"
+        separator += "--------|"
+    lines.append(header)
+    lines.append(separator)
 
-    # Summary
-    lines.append("## Summary")
-    lines.append("")
-    lines.append("| Metric | Value |")
-    lines.append("|--------|-------|")
-    lines.append(f"| Items Processed | {results.get('processed', 0)} |")
+    # Item count
+    row = "| Items |"
+    for run in runs_data:
+        row += f" {run['item_count']} |"
+    lines.append(row)
 
-    pass_rate = results.get('pass_rate', 0) * 100
-    passed = results.get('passed', 0)
-    total = results.get('total_items', 0)
-    lines.append(f"| Pass Rate | {pass_rate:.0f}% ({passed}/{total}) |")
+    # Collect all score names
+    all_scores = set()
+    for run in runs_data:
+        all_scores.update(run.get('score_stats', {}).keys())
 
-    avg_score = results.get('avg_quality_score')
-    if avg_score is not None:
-        lines.append(f"| Avg Quality Score | {avg_score:.1f} |")
+    # Score comparisons
+    for score_name in sorted(all_scores):
+        row = f"| {score_name} (avg) |"
+        for run in runs_data:
+            stats = run.get('score_stats', {}).get(score_name, {})
+            mean = stats.get('mean', '-')
+            if isinstance(mean, float):
+                mean = f"{mean:.3f}"
+            row += f" {mean} |"
+        lines.append(row)
 
-    duration = results.get('total_duration', 0)
-    lines.append(f"| Total Duration | {duration:.1f}s |")
-
-    if results.get('errors', 0) > 0:
-        lines.append(f"| Execution Errors | {results['errors']} |")
-
-    lines.append("")
-
-    # Item Results
-    lines.append("## Item Results")
     lines.append("")
 
-    for i, item in enumerate(results.get("items", []), 1):
-        input_summary = item.get("input_summary", {})
-        ticker = input_summary.get("ticker", "Unknown")
-        topic = input_summary.get("topic", "")
-        passed = item.get("passed", False)
-
-        status_icon = "✅" if passed else "❌"
-        lines.append(f"### Item {i}: {ticker} {status_icon}")
-        lines.append("")
-
-        if topic:
-            lines.append(f"**Topic:** {topic}")
-
-        execution = item.get("execution", {})
-        if execution.get("trace_id"):
-            lines.append(f"**Trace ID:** `{execution['trace_id'][:20]}...`")
-        lines.append(f"**Duration:** {execution.get('duration', 0):.1f}s")
-
-        if execution.get("error"):
-            lines.append(f"**Error:** {execution['error']}")
-        else:
+    # Detailed stats per score
+    if all_scores:
+        lines.append("## Score Details\n")
+        for score_name in sorted(all_scores):
+            lines.append(f"### {score_name}\n")
+            lines.append("| Run | Mean | Min | Max | Count |")
+            lines.append("|-----|------|-----|-----|-------|")
+            for run in runs_data:
+                stats = run.get('score_stats', {}).get(score_name, {})
+                mean = f"{stats.get('mean', 0):.3f}" if 'mean' in stats else "-"
+                min_v = f"{stats.get('min', 0):.3f}" if 'min' in stats else "-"
+                max_v = f"{stats.get('max', 0):.3f}" if 'max' in stats else "-"
+                count = stats.get('count', '-')
+                lines.append(f"| {run['name']} | {mean} | {min_v} | {max_v} | {count} |")
             lines.append("")
-            lines.append("**Evaluations:**")
-            for eval_result in item.get("evaluations", []):
-                eval_icon = "✅" if eval_result.get("passed") else "❌"
-                lines.append(f"- {eval_icon} **{eval_result.get('name')}:** {eval_result.get('comment')}")
-
-        lines.append("")
-
-    # Failed Items Table
-    failed_items = [item for item in results.get("items", []) if not item.get("passed")]
-    if failed_items:
-        lines.append("## Failed Items")
-        lines.append("")
-        lines.append("| Item | Issue | Details |")
-        lines.append("|------|-------|---------|")
-
-        for item in failed_items:
-            ticker = item.get("input_summary", {}).get("ticker", "?")
-
-            # Find failing evaluations
-            issues = []
-            for eval_result in item.get("evaluations", []):
-                if not eval_result.get("passed"):
-                    issues.append(f"{eval_result.get('name')}: {eval_result.get('comment', '')[:30]}")
-
-            if item.get("execution", {}).get("error"):
-                issues.append(f"Execution error: {item['execution']['error'][:30]}")
-
-            issue_str = "; ".join(issues) if issues else "Unknown"
-            lines.append(f"| {ticker} | {issue_str[:40]} | See trace |")
-
-        lines.append("")
-
-    # Next Steps
-    lines.append("## Next Steps")
-    lines.append("")
-    if pass_rate >= 80:
-        lines.append("✅ **Good pass rate!** Consider:")
-        lines.append("1. Reviewing any failed items")
-        lines.append("2. Adding more items to the dataset for broader coverage")
-        lines.append("3. Deploying the config changes")
-    else:
-        lines.append("⚠️ **Low pass rate.** Recommended actions:")
-        lines.append("1. Review failed item traces in Langfuse")
-        lines.append("2. Investigate root cause of failures")
-        lines.append("3. Apply additional fixes")
-        lines.append("4. Re-run experiment")
 
     return "\n".join(lines)
 
 
-# =============================================================================
-# MAIN
-# =============================================================================
+def analyze_run(
+    dataset_name: str,
+    run_name: str,
+    show_failures: bool = False,
+    score_threshold: Optional[float] = None,
+    score_name: Optional[str] = None
+) -> str:
+    """Analyze an experiment run with score distributions and failure details."""
+    run = get_run(dataset_name, run_name)
+    if not run:
+        return f"Error: Run '{run_name}' not found in dataset '{dataset_name}'"
+
+    lines = [f"# Analysis: {run_name}\n"]
+    lines.append(f"**Dataset:** {dataset_name}")
+    lines.append(f"**Created:** {run.get('created_at', 'Unknown')}")
+    lines.append(f"**Total Items:** {run.get('item_count', 0)}")
+
+    if run.get('description'):
+        lines.append(f"**Description:** {run['description']}")
+    lines.append("")
+
+    # Score statistics
+    score_stats = run.get('score_stats', {})
+    if score_stats:
+        lines.append("## Score Summary\n")
+        lines.append("| Score | Mean | Min | Max | Count |")
+        lines.append("|-------|------|-----|-----|-------|")
+        for name, stats in score_stats.items():
+            mean = f"{stats.get('mean', 0):.3f}"
+            min_v = f"{stats.get('min', 0):.3f}"
+            max_v = f"{stats.get('max', 0):.3f}"
+            count = stats.get('count', 0)
+            lines.append(f"| {name} | {mean} | {min_v} | {max_v} | {count} |")
+        lines.append("")
+
+    # Filter items by score threshold
+    items = run.get('items', [])
+    if score_threshold is not None and score_name:
+        filtered_items = []
+        for item in items:
+            scores = item.get('scores', {})
+            if score_name in scores:
+                if scores[score_name] < score_threshold:
+                    filtered_items.append(item)
+        items = filtered_items
+        lines.append(f"## Items Below Threshold\n")
+        lines.append(f"Showing items where `{score_name}` < {score_threshold}")
+        lines.append(f"**Count:** {len(items)}\n")
+    elif show_failures:
+        # Show items with any low scores (< 0.5 for normalized scores)
+        failure_items = []
+        for item in items:
+            scores = item.get('scores', {})
+            for name, value in scores.items():
+                if isinstance(value, (int, float)) and value < 0.5:
+                    failure_items.append(item)
+                    break
+        items = failure_items
+        lines.append("## Low-Scoring Items\n")
+        lines.append(f"**Count:** {len(items)}\n")
+
+    # Show item details
+    if items and (show_failures or score_threshold is not None):
+        for i, item in enumerate(items[:20]):  # Limit to 20 items
+            lines.append(f"### Item {i+1}")
+            if item.get('input'):
+                input_str = json.dumps(item['input']) if isinstance(item['input'], dict) else str(item['input'])
+                if len(input_str) > 200:
+                    input_str = input_str[:200] + "..."
+                lines.append(f"**Input:** `{input_str}`")
+
+            if item.get('expected_output'):
+                expected = str(item['expected_output'])
+                if len(expected) > 200:
+                    expected = expected[:200] + "..."
+                lines.append(f"**Expected:** `{expected}`")
+
+            if item.get('output'):
+                output = str(item['output'])
+                if len(output) > 200:
+                    output = output[:200] + "..."
+                lines.append(f"**Actual:** `{output}`")
+
+            if item.get('scores'):
+                scores_str = ", ".join(f"{k}: {v:.3f}" if isinstance(v, float) else f"{k}: {v}"
+                                      for k, v in item['scores'].items())
+                lines.append(f"**Scores:** {scores_str}")
+            lines.append("")
+
+        if len(run.get('items', [])) > 20:
+            lines.append(f"*...and {len(run.get('items', [])) - 20} more items*\n")
+
+    return "\n".join(lines)
+
+
+def format_run_list(runs: List[Dict[str, Any]], dataset_name: str) -> str:
+    """Format run list for display."""
+    if not runs:
+        return f"No runs found for dataset '{dataset_name}'"
+
+    lines = [f"# Experiment Runs: {dataset_name}\n"]
+    lines.append("| Name | Created | Description |")
+    lines.append("|------|---------|-------------|")
+
+    for run in runs:
+        name = run.get('name', '?')
+        created = run.get('created_at', '-')
+        if created and len(created) > 19:
+            created = created[:19]
+        desc = run.get('description', '-') or '-'
+        if len(desc) > 50:
+            desc = desc[:50] + "..."
+        lines.append(f"| {name} | {created} | {desc} |")
+
+    return "\n".join(lines)
+
+
+def format_run_detail(run: Dict[str, Any]) -> str:
+    """Format run details for display."""
+    if not run:
+        return "Run not found"
+
+    lines = [f"# Run: {run.get('name', '?')}\n"]
+    lines.append(f"**Dataset:** {run.get('dataset', '?')}")
+    lines.append(f"**Created:** {run.get('created_at', 'Unknown')}")
+    lines.append(f"**Items:** {run.get('item_count', 0)}")
+
+    if run.get('description'):
+        lines.append(f"**Description:** {run['description']}")
+
+    if run.get('metadata'):
+        lines.append("\n## Metadata\n")
+        lines.append("```json")
+        lines.append(json.dumps(run['metadata'], indent=2))
+        lines.append("```")
+
+    score_stats = run.get('score_stats', {})
+    if score_stats:
+        lines.append("\n## Scores\n")
+        lines.append("| Score | Mean | Min | Max | Count |")
+        lines.append("|-------|------|-----|-----|-------|")
+        for name, stats in score_stats.items():
+            mean = f"{stats.get('mean', 0):.3f}"
+            min_v = f"{stats.get('min', 0):.3f}"
+            max_v = f"{stats.get('max', 0):.3f}"
+            count = stats.get('count', 0)
+            lines.append(f"| {name} | {mean} | {min_v} | {max_v} | {count} |")
+
+    return "\n".join(lines)
+
+
+def format_result(result: Dict[str, Any]) -> str:
+    """Format experiment result for display."""
+    if result.get('status') == 'error':
+        return f"Error: {result.get('message', 'Unknown error')}"
+
+    lines = ["# Experiment Complete\n"]
+    lines.append(f"**Dataset:** {result.get('dataset', '?')}")
+    lines.append(f"**Run:** {result.get('run_name', '?')}")
+    lines.append(f"**Total Items:** {result.get('total_items', 0)}")
+    lines.append(f"**Successful:** {result.get('successful', 0)}")
+    lines.append(f"**Failed:** {result.get('failed', 0)}")
+
+    if result.get('evaluators_used'):
+        lines.append(f"**Evaluators:** {', '.join(result['evaluators_used'])}")
+
+    if result.get('score_averages'):
+        lines.append("\n## Average Scores\n")
+        for name, avg in result['score_averages'].items():
+            lines.append(f"- **{name}:** {avg:.3f}")
+
+    return "\n".join(lines)
+
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run experiments against Langfuse datasets",
+        description="Langfuse Experiment Runner",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Evaluators:
-  quality_score   Compare output quality to expected minimum
-  word_count      Validate minimum word count
-
-Examples:
-  %(prog)s --dataset "case_0001_regressions" --name "Fix: Add earnings tool"
-  %(prog)s --dataset "case_0001_regressions" --name "Test" --evaluators quality_score word_count
-  %(prog)s --dataset "case_0001_regressions" --name "Test" --metadata '{"version": "v2"}'
-        """
     )
 
-    parser.add_argument(
-        "--dataset",
-        required=True,
-        help="Dataset name to run experiment against"
-    )
-    parser.add_argument(
-        "--name",
-        required=True,
-        help="Name for this experiment run"
-    )
-    parser.add_argument(
-        "--description",
-        help="Description of the experiment (e.g., what changed)"
-    )
-    parser.add_argument(
-        "--evaluators",
-        nargs="+",
-        default=["quality_score", "word_count"],
-        choices=list(EVALUATORS.keys()),
-        help="Evaluators to run (default: quality_score word_count)"
-    )
-    parser.add_argument(
-        "--max-concurrency",
-        type=int,
-        default=2,
-        help="Max parallel items (default: 2, sequential for now)"
-    )
-    parser.add_argument(
-        "--metadata",
-        type=json.loads,
-        help="JSON metadata for the run"
-    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Run command
+    run_parser = subparsers.add_parser("run", help="Run an experiment on a dataset")
+    run_parser.add_argument("--dataset", required=True, help="Dataset name")
+    run_parser.add_argument("--run-name", required=True, help="Name for this experiment run")
+    run_parser.add_argument("--task-script", required=True,
+                           help="Path to Python script with task() function")
+    run_parser.add_argument("--evaluator-script",
+                           help="Path to Python script with evaluator functions")
+    run_parser.add_argument("--max-concurrency", type=int, default=5,
+                           help="Maximum concurrent executions (default: 5)")
+    run_parser.add_argument("--description", help="Run description")
+
+    # List runs command
+    list_parser = subparsers.add_parser("list-runs", help="List experiment runs for a dataset")
+    list_parser.add_argument("--dataset", required=True, help="Dataset name")
+
+    # Get run command
+    get_parser = subparsers.add_parser("get-run", help="Get details of an experiment run")
+    get_parser.add_argument("--dataset", required=True, help="Dataset name")
+    get_parser.add_argument("--run-name", required=True, help="Run name")
+
+    # Compare runs command
+    compare_parser = subparsers.add_parser("compare", help="Compare experiment runs")
+    compare_parser.add_argument("--dataset", required=True, help="Dataset name")
+    compare_parser.add_argument("--runs", nargs="+", required=True, help="Run names to compare")
+
+    # Analyze run command
+    analyze_parser = subparsers.add_parser("analyze", help="Analyze experiment run results")
+    analyze_parser.add_argument("--dataset", required=True, help="Dataset name")
+    analyze_parser.add_argument("--run-name", required=True, help="Run name")
+    analyze_parser.add_argument("--show-failures", action="store_true",
+                               help="Show items with low scores")
+    analyze_parser.add_argument("--score-threshold", type=float,
+                               help="Show items below this score threshold")
+    analyze_parser.add_argument("--score-name", help="Score name to filter by")
 
     args = parser.parse_args()
 
-    print(f"Starting experiment: {args.name}", file=sys.stderr)
-    print(f"Dataset: {args.dataset}", file=sys.stderr)
-    print(f"Evaluators: {', '.join(args.evaluators)}", file=sys.stderr)
-    print("", file=sys.stderr)
+    if args.command == "run":
+        result = run_experiment(
+            args.dataset,
+            args.run_name,
+            args.task_script,
+            evaluator_script=args.evaluator_script,
+            max_concurrency=args.max_concurrency,
+            run_description=args.description
+        )
+        print(format_result(result))
 
-    results = run_experiment(
-        dataset_name=args.dataset,
-        run_name=args.name,
-        description=args.description,
-        evaluator_names=args.evaluators,
-        max_concurrency=args.max_concurrency,
-        metadata=args.metadata
-    )
+    elif args.command == "list-runs":
+        runs = list_runs(args.dataset)
+        print(format_run_list(runs, args.dataset))
 
-    report = format_experiment_report(results)
-    print(report)
+    elif args.command == "get-run":
+        run = get_run(args.dataset, args.run_name)
+        print(format_run_detail(run))
+
+    elif args.command == "compare":
+        comparison = compare_runs(args.dataset, args.runs)
+        print(comparison)
+
+    elif args.command == "analyze":
+        analysis = analyze_run(
+            args.dataset,
+            args.run_name,
+            show_failures=args.show_failures,
+            score_threshold=args.score_threshold,
+            score_name=args.score_name
+        )
+        print(analysis)
 
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 {
   "name": "langfuse-analyzer",
-  "version": "0.1.0",
-  "description": "Surgical Langfuse trace retrieval with multiple output modes for LLM-friendly debugging",
+  "version": "0.5.0",
+  "description": "Complete Langfuse toolkit for instrumentation setup, trace analysis, prompt management, dataset curation, experiment evaluation, score analytics, session analysis, and human annotation",
   "author": {
-    "name": "Writing Ecosystem Team"
+    "name": "Mberto"
   },
-  "keywords": ["langfuse", "tracing", "debugging", "observability", "optimization"]
+  "keywords": ["langfuse", "tracing", "debugging", "observability", "analysis", "datasets", "prompts", "experiments", "evaluation", "scores", "analytics", "sessions", "annotation", "instrumentation", "setup"]
 }
