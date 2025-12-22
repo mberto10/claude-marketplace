@@ -28,3 +28,7 @@ node_modules/
 __pycache__/
 *.pyc
 *.pyo
+
+# Claude Code local settings
+.claude/
+plugins/.claude-plugin/
