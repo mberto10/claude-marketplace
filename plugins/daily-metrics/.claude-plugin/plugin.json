@@ -1,0 +1,9 @@
+{
+  "name": "daily-metrics",
+  "version": "0.1.0",
+  "description": "Personal tracking and goal management system with Supabase integration",
+  "author": {
+    "name": "Maximilian Bruhn"
+  },
+  "keywords": ["habits", "tracking", "goals", "metrics", "personal-development"]
+}
