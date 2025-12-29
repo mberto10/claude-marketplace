@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "mberto-core",
-      "source": "./mberto-core",
+      "source": "./plugins/mberto-core",
       "description": "Core infrastructure with standard MCP servers (Linear, Context7, Langfuse) for quick project setup",
       "version": "1.0.0",
       "author": {
@@ -26,7 +26,7 @@
     },
     {
       "name": "example-plugin",
-      "source": "./example-plugin",
+      "source": "./plugins/example-plugin",
       "description": "Example plugin demonstrating the structure for commands, agents, skills, and hooks",
       "version": "1.0.0",
       "author": {
@@ -41,7 +41,7 @@
     },
     {
       "name": "langfuse-analyzer",
-      "source": "./langfuse-analyzer",
+      "source": "./plugins/langfuse-analyzer",
       "description": "Surgical Langfuse trace retrieval with multiple output modes for LLM-friendly debugging and optimization workflows",
       "version": "0.1.0",
       "author": {
@@ -55,7 +55,7 @@
     },
     {
       "name": "langdock-dev",
-      "source": "./langdock-dev",
+      "source": "./plugins/langdock-dev",
       "description": "Build Langdock integration actions and use Langdock APIs with live documentation fetching",
       "version": "0.1.0",
       "author": {
@@ -70,7 +70,7 @@
     },
     {
       "name": "writing-studio",
-      "source": "./writing-studio",
+      "source": "./plugins/writing-studio",
       "description": "Comprehensive writing assistant with style learning, brainstorming, planning, drafting, and editing workflows that maintain your personal voice",
       "version": "1.0.0",
       "author": {
@@ -85,7 +85,7 @@
     },
     {
       "name": "work-toolkit",
-      "source": "./work-toolkit",
+      "source": "./plugins/work-toolkit",
       "description": "Personal management plugin for daily planning with Linear, German business communication, and YouTrack documentation",
       "version": "0.1.0",
       "author": {
@@ -100,7 +100,7 @@
     },
     {
       "name": "thinking-studio",
-      "source": "./thinking-studio",
+      "source": "./plugins/thinking-studio",
       "description": "Personal thinking patterns and resonant ideas - your mental model fingerprint",
       "version": "0.1.0",
       "author": {
@@ -115,7 +115,7 @@
     },
     {
       "name": "openai-apps-sdk",
-      "source": "./openai-apps-sdk",
+      "source": "./plugins/openai-apps-sdk",
       "description": "Comprehensive toolkit for building MCP servers with the OpenAI Apps SDK. Provides skills, commands, and agents for creating ChatGPT apps with Python and TypeScript.",
       "version": "0.1.0",
       "author": {
@@ -130,7 +130,7 @@
     },
     {
       "name": "compound-loop",
-      "source": "./compound-loop",
+      "source": "./plugins/compound-loop",
       "description": "Structured feedback loop for capturing learnings from plugin usage anywhere and consolidating them into improvements",
       "version": "0.1.0",
       "author": {
