@@ -1,32 +1,64 @@
 ---
 name: YouTrack Dashboard
-description: This skill should be used when the user asks to "write a youtrack comment", "create youtrack ticket", "update youtrack issue", "get youtrack comments", "compile weekly update from youtrack", "check epic status", "sync Linear to YouTrack", "update youtrack epic", mentions "KW" (Kalenderwoche) updates, or references YouTrack issue IDs like "AI-74", "AI-76". Provides guidance for interacting with the YouTrack REST API at fazit.youtrack.cloud and syncing with Linear.
-version: 0.2.0
+description: This skill should be used when the user asks to "write a youtrack comment", "create youtrack ticket", "update youtrack issue", "get youtrack comments", "compile weekly update from youtrack", "check epic status", "update youtrack epic", "review epic health", mentions "KW" (Kalenderwoche) updates, or references YouTrack issue IDs like "AI-74", "AI-76". Provides guidance for interacting with the YouTrack REST API at fazit.youtrack.cloud.
+version: 0.3.0
 ---
 
 # YouTrack Dashboard
 
-Interact with YouTrack (fazit.youtrack.cloud) via REST API for ticket management, comments, and weekly status compilation. Includes Linear integration for bidirectional project management.
+Interact with YouTrack (fazit.youtrack.cloud) via REST API for ticket management, comments, and weekly status compilation.
+
+## Important: No Linear References
+
+**Never reference Linear or Linear issue IDs in YouTrack documentation.** Linear is a personal planning system. YouTrack is the official record for stakeholders and Lenkungsausschuss reporting.
+
+When writing to YouTrack:
+- Reference YouTrack Aufgaben (e.g., `AI-305`) not Linear issues
+- Use YouTrack as the source of truth for project status
+- Keep all official documentation in YouTrack only
 
 ## Slash Commands
 
+### `/add-kw-update <project> <section> <content>`
+Quickly add an entry to the current week's KW update:
+- **section**: `update`, `blocker`, or `next`
+- Automatically creates or updates the KW comment
+- See `youtrack-documentation-guide.md` for format
+
+Example: `/add-kw-update "Customer Support Chatbot" update "System prompt v2 deployed"`
+
 ### `/update-youtrack-epic <project_name>`
-Generate a KW (Kalenderwoche) update from Linear project activity and post to both:
-- **YouTrack**: As a comment on the matching epic
-- **Linear**: Appended to project description
+Generate a full KW update from project activity and post to YouTrack epic.
 
-Options: `--youtrack-only`, `--linear-only`
+Option: `--dry-run` for preview without posting
 
-### `/sync-linear-to-youtrack <project_name>`
-One-way sync of open issues from Linear to YouTrack:
-- Creates YouTrack sub-tasks under the matching epic
-- Uses `[LINEAR_ID]` prefix for tracking
-- Safe to re-run (skips already-synced issues)
+### `/prepare-jf-team <team_member>`
+Prepare JF agenda for all projects where a team member is Bearbeiter:
+- Fetches all active epics for the person
+- Shows milestones, current status, blockers
+- Flags items needing attention
 
-Option: `--dry-run` for preview
+Example: `/prepare-jf-team "Maximilian"`
+
+### `/review-epics [team_member]`
+Review health of active epics:
+- Missing descriptions/Projektziel
+- Missing milestone tables
+- No Bearbeiter assigned
+- Stale updates (>2 weeks)
+
+Example: `/review-epics` or `/review-epics "Maximilian"`
 
 ### `/weekly-email`
 Compile weekly Lenkungsausschuss update from all YouTrack KW comments.
+
+### `/sync-to-youtrack <project_name>`
+Sync Linear project issues to YouTrack Aufgaben:
+- Creates Aufgaben under matching epic
+- Maps status: Backlog/Todo → Backlog, In Progress → Aufgaben, Done → Geschlossen
+- Tracks mapping in Linear (YouTrack stays clean)
+
+Example: `/sync-to-youtrack "Web Research Agents"`
 
 ## Recommended: Use helper_tools CLI
 
@@ -40,20 +72,34 @@ python helper_tools/youtrack/yt.py get AI-123
 python helper_tools/youtrack/yt.py search "State: Open"
 python helper_tools/youtrack/yt.py search "assignee: me"
 
+# Find epic by project name
+python helper_tools/youtrack/yt.py find-epic "Customer Support Chatbot"
+
+# List team member's active epics
+python helper_tools/youtrack/yt.py team-epics "Maximilian"
+
+# Check epic health (descriptions, milestones, updates)
+python helper_tools/youtrack/yt.py health-check "Maximilian"
+
 # Create ticket in AI project
 python helper_tools/youtrack/yt.py create "Bug: Login fails" "Users cannot log in"
 
 # Add comment
 python helper_tools/youtrack/yt.py comment AI-123 "Fixed in latest commit"
 
-# Update ticket
-python helper_tools/youtrack/yt.py update AI-123 --state="Done" --assignee="john"
+# Update existing comment
+python helper_tools/youtrack/yt.py update-comment AI-123 4-443828 "Updated text..."
+
+# Get comments (use --full for complete text)
+python helper_tools/youtrack/yt.py comments AI-123 --full
 
 # Get weekly KW updates from all epic tickets
 python helper_tools/youtrack/get_kw_updates.py --kw=39
 
-# Get project updates for weekly email
-python helper_tools/youtrack/get_weekly_project_updates.py --weeks-back=1
+# Sync helpers (for Linear → YouTrack sync)
+python helper_tools/youtrack/sync_linear.py create AI-62 "Task title" "Description"
+python helper_tools/youtrack/sync_linear.py update-state AI-401 "Aufgaben"
+python helper_tools/youtrack/sync_linear.py map-state "In Progress"  # → Aufgaben
 ```
 
 See `helper_tools/README.md` for complete documentation.
@@ -166,21 +212,6 @@ python helper_tools/youtrack/get_weekly_project_updates.py --weeks-back=1 --form
 | Priority | Critical, Major, Normal, Minor |
 | Epic | (Dynamic - links to parent Story) |
 
-## Linear Integration
-
-YouTrack and Linear are used together for project management:
-
-| System | Purpose | Primary Use |
-|--------|---------|-------------|
-| **Linear** | Day-to-day task management | Active development work, sprints |
-| **YouTrack** | Executive reporting | Lenkungsausschuss updates, epic tracking |
-
-### Project Mapping
-
-Linear projects map to YouTrack epics by name:
-- Linear: "Customer Support Chatbot" project
-- YouTrack: AI-XX "Customer Support Chatbot" (Type: Story, State: Projektticket)
-
 ## Tips
 
 - **Markdown in comments:** Set `usesMarkdown: true` when posting comments for rich formatting
@@ -190,5 +221,6 @@ Linear projects map to YouTrack epics by name:
 
 ## Reference Files
 
-- **`references/api-reference.md`** - Complete YouTrack REST API field reference
-- **`examples/kw-comment-template.md`** - Template for KW update comments
+- **`references/youtrack-documentation-guide.md`** - How we document in YouTrack (KW format, epic structure, best practices)
+- **`references/api-reference.md`** - YouTrack REST API field reference
+- **`examples/kw-comment-template.md`** - KW comment template with examples

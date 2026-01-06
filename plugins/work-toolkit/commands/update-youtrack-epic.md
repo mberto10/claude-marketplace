@@ -25,18 +25,18 @@ Generate a KW (Kalenderwoche) update from Linear project activity and post to bo
    python ${CLAUDE_PLUGIN_ROOT}/helper_tools/youtrack/yt.py search "project: AI Type: Story \"<project_name>\""
    ```
 
-4. **Generate KW update** in format:
+4. **Generate KW update** in format (see `youtrack-documentation-guide.md`):
    ```markdown
-   **KW[XX] Update**
+   ## KW{number}
 
-   **Erledigt:**
+   **Updates:**
    - [Completed items from Linear]
+   - [Progress made this week]
 
-   **In Arbeit:**
-   - [In progress items]
+   **Blocker:** [Issues or "Keine"]
 
-   **Nächste Schritte:**
-   - [Planned items]
+   **Next Steps:**
+   - [Planned items for next week]
    ```
 
 5. **Post to YouTrack** (unless `--linear-only`):

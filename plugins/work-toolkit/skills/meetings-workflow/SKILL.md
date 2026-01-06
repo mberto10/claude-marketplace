@@ -202,3 +202,4 @@ High-level steering committee meeting - combine all project updates.
 
 - **`references/meeting-types.md`** - Different meeting formats
 - **`examples/jf-agenda-example.md`** - Real JF agenda example
+- **`../youtrack-dashboard/references/youtrack-documentation-guide.md`** - KW format and YouTrack documentation practices

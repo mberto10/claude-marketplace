@@ -26,7 +26,7 @@ Compile weekly update email for Lenkungsausschuss from all YouTrack project KW c
    python ${CLAUDE_PLUGIN_ROOT}/helper_tools/youtrack/get_kw_updates.py --kw=XX
    ```
 
-3. **Compile into email format**:
+3. **Compile into email format** (based on `youtrack-documentation-guide.md`):
    ```
    Betreff: AI Team Status - KW [XX]
 
@@ -38,14 +38,13 @@ Compile weekly update email for Lenkungsausschuss from all YouTrack project KW c
 
    ## [Project 1 Name]
 
-   **Erledigt:**
-   - [Items]
+   **Updates:**
+   - [Progress items from KW comment]
 
-   **In Arbeit:**
-   - [Items]
+   **Blocker:** [Issues or "Keine"]
 
-   **Nächste Schritte:**
-   - [Items]
+   **Next Steps:**
+   - [Planned items]
 
    ---
 
