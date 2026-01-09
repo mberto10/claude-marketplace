@@ -56,8 +56,8 @@
     {
       "name": "writing-studio",
       "source": "./plugins/writing-studio",
-      "description": "Comprehensive writing assistant with style learning, brainstorming, planning, drafting, and editing workflows that maintain your personal voice",
-      "version": "1.0.0",
+      "description": "Comprehensive writing assistant with quality loop workflow: deep discovery, voice profiles, iterative self-critique, and publication-ready output",
+      "version": "2.0.0",
       "author": {
         "name": "Maximilian Bruhn",
         "email": "puzzle.ai.studio@gmail.com"
@@ -65,7 +65,7 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["writing", "style", "drafting", "editing", "brainstorming", "content", "workflow"],
+      "keywords": ["writing", "style", "drafting", "editing", "brainstorming", "content", "workflow", "critique", "voice", "quality-loop"],
       "category": "writing"
     },
     {

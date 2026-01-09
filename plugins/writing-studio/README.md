@@ -1,20 +1,22 @@
 # Writing Studio
 
-A comprehensive, interactive writing assistant plugin for Claude Code that maintains your personal writing style across the full creative workflow.
+A comprehensive writing assistant plugin for Claude Code with quality loop workflow: deep discovery, voice profiles, iterative self-critique, and publication-ready output.
 
 ## Features
 
-- **Style Learning**: Learns your writing style from samples and preferences
-- **Writer Profiling**: Deep analysis of writing samples to create comprehensive writer profiles
-- **Full Workflow Support**: Brainstorming → Planning → Drafting → Editing
-- **Interactive Checkpoints**: Structured decision points throughout the process
-- **Flexible Access**: Use the main `/write` command or individual stage commands
-- **Personalized Assistants**: Build writing assistants that truly match your voice
+- **Quality Loop Workflow**: Iterative write → critique → iterate cycle until publication-ready
+- **Deep Discovery**: Extensive questioning to understand complex ideas before writing
+- **Writer Profiling**: 12-dimension analysis to create comprehensive voice profiles
+- **Self-Critique**: Rigorous evaluation against voice profiles with scoring and weakness identification
+- **Interactive Checkpoints**: Structured decision points with AskUserQuestion throughout
+- **Voice Matching**: Score drafts against profiles (1-10) with publish test
+- **Full Workflow Support**: Discover → Learn → Ideate → Plan → Write → Critique → Polish → Publish
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
+| `/write-loop <topic>` | **NEW**: Start quality loop workflow with iterative critique |
 | `/write <topic>` | Start a complete writing session with guided workflow |
 | `/setup-style [file]` | Create or update your style guide interactively |
 | `/profile-writer <samples>` | Create comprehensive writer profile from samples |
@@ -23,6 +25,47 @@ A comprehensive, interactive writing assistant plugin for Claude Code that maint
 | `/plan <topic>` | Create structured outlines |
 | `/draft <outline>` | Write content following your style |
 | `/edit <content>` | Refine and polish writing |
+
+## Quality Loop Workflow
+
+```
+DISCOVER → LEARN → IDEATE → PLAN → WRITE → CRITIQUE ←→ ITERATE → POLISH → PUBLISH
+                                              ↑              │
+                                              └──── NO ──────┘
+```
+
+### The Loop
+
+1. **DISCOVER**: Deep understanding of your idea through extensive questioning
+2. **LEARN**: Load voice profile as the quality rubric
+3. **IDEATE**: Generate unique angles, select the best direction
+4. **PLAN**: Create structural outline
+5. **WRITE**: Draft with full voice commitment
+6. **CRITIQUE**: Score against profile, identify weaknesses, decide pass/iterate
+7. **ITERATE**: Address weaknesses systematically (loops back to CRITIQUE)
+8. **POLISH**: Final editing pass
+9. **PUBLISH**: Export with metadata and iteration history
+
+### Quality Gates
+
+A draft passes when:
+- Voice match score ≥ 8/10
+- Publish test = PROUD ("Would the author actually publish this?")
+- Critical weaknesses = 0
+- Overall score ≥ 7.5
+
+### Usage
+
+```bash
+# Start quality loop with a topic
+/write-loop "Why most productivity advice fails"
+
+# Specify voice profile
+/write-loop "The future of remote work" --voice steven-pinker
+
+# Set iteration limits
+/write-loop "My leadership philosophy" --max-iterations 5 --threshold 8
+```
 
 ## Setup
 
