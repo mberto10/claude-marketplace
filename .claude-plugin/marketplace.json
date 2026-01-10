@@ -21,7 +21,14 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["core", "mcp", "infrastructure", "linear", "context7", "langfuse"],
+      "keywords": [
+        "core",
+        "mcp",
+        "infrastructure",
+        "linear",
+        "context7",
+        "langfuse"
+      ],
       "category": "infrastructure"
     },
     {
@@ -35,7 +42,13 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["langfuse", "tracing", "debugging", "observability", "optimization"],
+      "keywords": [
+        "langfuse",
+        "tracing",
+        "debugging",
+        "observability",
+        "optimization"
+      ],
       "category": "observability"
     },
     {
@@ -50,7 +63,13 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["langdock", "integrations", "actions", "api", "development"],
+      "keywords": [
+        "langdock",
+        "integrations",
+        "actions",
+        "api",
+        "development"
+      ],
       "category": "development"
     },
     {
@@ -65,7 +84,18 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["writing", "style", "drafting", "editing", "brainstorming", "content", "workflow", "critique", "voice", "quality-loop"],
+      "keywords": [
+        "writing",
+        "style",
+        "drafting",
+        "editing",
+        "brainstorming",
+        "content",
+        "workflow",
+        "critique",
+        "voice",
+        "quality-loop"
+      ],
       "category": "writing"
     },
     {
@@ -80,7 +110,15 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["productivity", "planning", "linear", "youtrack", "communication", "german", "documentation"],
+      "keywords": [
+        "productivity",
+        "planning",
+        "linear",
+        "youtrack",
+        "communication",
+        "german",
+        "documentation"
+      ],
       "category": "productivity"
     },
     {
@@ -95,7 +133,13 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["thinking", "mental-models", "ideas", "patterns", "personal"],
+      "keywords": [
+        "thinking",
+        "mental-models",
+        "ideas",
+        "patterns",
+        "personal"
+      ],
       "category": "personal"
     },
     {
@@ -110,7 +154,15 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["openai", "apps-sdk", "mcp", "model-context-protocol", "chatgpt", "mcp-server", "widgets"],
+      "keywords": [
+        "openai",
+        "apps-sdk",
+        "mcp",
+        "model-context-protocol",
+        "chatgpt",
+        "mcp-server",
+        "widgets"
+      ],
       "category": "development"
     },
     {
@@ -125,7 +177,13 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["compounding", "feedback-loop", "learning", "meta", "self-improvement"],
+      "keywords": [
+        "compounding",
+        "feedback-loop",
+        "learning",
+        "meta",
+        "self-improvement"
+      ],
       "category": "meta"
     },
     {
@@ -140,7 +198,12 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["linear", "continuity", "compound-loop", "long-running-tasks"],
+      "keywords": [
+        "linear",
+        "continuity",
+        "compound-loop",
+        "long-running-tasks"
+      ],
       "category": "productivity"
     },
     {
@@ -155,8 +218,35 @@
       "homepage": "https://github.com/mberto10/mberto-compound",
       "repository": "https://github.com/mberto10/mberto-compound",
       "license": "MIT",
-      "keywords": ["habits", "tracking", "goals", "metrics", "personal-development"],
+      "keywords": [
+        "habits",
+        "tracking",
+        "goals",
+        "metrics",
+        "personal-development"
+      ],
       "category": "personal"
+    },
+    {
+      "name": "ux-evaluator",
+      "source": "./plugins/ux-evaluator",
+      "description": "Frontend UX evaluation using User Lifecycle Framework and Playwright browser automation",
+      "version": "0.1.0",
+      "author": {
+        "name": "Dispatch Team"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "ux",
+        "frontend",
+        "evaluation",
+        "playwright",
+        "user-lifecycle",
+        "testing"
+      ],
+      "category": "testing"
     }
   ]
 }
