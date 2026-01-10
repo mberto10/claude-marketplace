@@ -4,40 +4,83 @@ Frontend UX evaluation and production readiness testing using the User Lifecycle
 
 ## Overview
 
-This plugin provides two complementary evaluation modes:
+This plugin provides three complementary evaluation modes:
 
 1. **UX Evaluation** (`/ux-eval`) - Assess user experience quality against heuristics
 2. **Dogfooding** (`/dogfood`) - Experience the product as a real user, then trace issues to code
+3. **MCP Evaluation** (`/mcp-eval`) - Evaluate MCP-powered apps through conversational intent lens
 
 **Core principle:** "As a user of this product, I can understand everything, it works flawlessly, and I see a lot of value out of it."
 
-## Two Evaluation Modes
+## Three Evaluation Modes
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  /ux-eval                           /dogfood                        │
-│  ─────────                          ─────────                       │
-│  UX Quality Assessment              Production Readiness Testing    │
-│                                                                     │
-│  "Does this feel right?"            "Does this actually work?"      │
-│                                                                     │
-│  • Apply heuristics                 • Experience as user            │
-│  • Evaluate clarity, efficiency     • Note confusion, friction      │
-│  • Check accessibility              • Assess value delivery         │
-│  • Generate UX report               • Trace issues to code          │
-│                                                                     │
-│  Output: UX issues with             Output: Experience report +     │
-│  recommendations                    Technical analysis              │
-└─────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────────────────────┐
+│  /ux-eval                    /dogfood                      /mcp-eval                          │
+│  ─────────                   ─────────                     ──────────                         │
+│  UX Quality Assessment       Production Readiness          MCP App Evaluation                 │
+│                                                                                               │
+│  "Does this feel right?"     "Does this work?"             "Does the tool→widget chain       │
+│                                                             serve user intents?"              │
+│                                                                                               │
+│  • Apply heuristics          • Experience as user          • Derive persona from concept     │
+│  • Evaluate clarity          • Note confusion/friction     • Walk UI as that persona         │
+│  • Check accessibility       • Assess value delivery       • Evaluate each screen's chain    │
+│  • Generate UX report        • Trace issues to code        • Detect MCP failure patterns     │
+│                                                            • Categorize by layer             │
+│                                                                                               │
+│  Output: UX issues           Output: Experience report     Output: Improvements by layer     │
+│  with recommendations        + Technical analysis          (schema/output/widget/flow)       │
+└───────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Recommended workflow:**
 1. Run `/dogfood` first - make sure it works
 2. Run `/ux-eval` second - make sure it feels right
+3. Run `/mcp-eval` for MCP apps - ensure tool→widget chain serves intents
+
+## MCP Evaluation Framework
+
+The `/mcp-eval` mode uses a specialized framework for MCP-powered apps:
+
+### Why MCP Apps Need Different Evaluation
+
+For MCP apps, users arrive at screens via LLM conversations. The evaluation must consider:
+- What tool calls would be made to serve the user's intent
+- Whether the tool output contains what the widget needs
+- Whether the widget presents information appropriately for the intent
+
+### MCP-Specific Failure Patterns
+
+| Pattern | Description |
+|---------|-------------|
+| Over-clarifying | Asking what could be inferred from context |
+| Under-clarifying | Committing without gathering necessary constraints |
+| Tool ping-pong | Multiple calls that could be batched |
+| Widget mismatch | Wrong display type for the user's intent |
+| Poor edit loop | Cannot refine without starting over |
+| No commit gate | Irreversible action without confirmation |
+| Error opacity | Technical errors shown verbatim |
+
+### Improvement Layers
+
+Improvements are categorized by what needs to change:
+
+| Layer | What Changes | Example |
+|-------|--------------|---------|
+| Tool Schema | Parameter definitions | Add `flexibility` param |
+| Tool Output | Response structure | Include `recommended` flag |
+| Widget | Display, controls | Add filter controls |
+| Flow | Screen sequence | Add confirmation step |
+
+### Two Modes
+
+- **Hypothetical tracing** - Infer tool calls from UI and codebase
+- **Actual tool calling** - Call MCP tools via HTTP endpoint to verify
 
 ## User Lifecycle Framework
 
-Both modes use the 8-phase User Lifecycle Framework:
+The `/ux-eval` and `/dogfood` modes use the 8-phase User Lifecycle Framework:
 
 | Phase | User Question | Goal |
 |-------|---------------|------|
@@ -217,6 +260,7 @@ dev_server_url: "http://localhost:3000"
 |---------|---------|
 | `/ux-eval` | UX quality assessment with heuristics |
 | `/dogfood` | Production readiness through user experience |
+| `/mcp-eval` | MCP app evaluation through conversational intent |
 
 ### Agents
 
@@ -225,8 +269,10 @@ dev_server_url: "http://localhost:3000"
 | `ux-evaluator` | Autonomous UX assessment against heuristics |
 | `dogfooding-evaluator` | User perspective - experiences product naturally |
 | `technical-debugger` | Developer perspective - traces issues to code |
+| `infrastructure-auditor` | Backend verification - checks if services are connected |
+| `mcp-evaluator` | MCP app evaluation - walks UI through intent lens |
 
-### Skill
+### Skills
 
 `user-lifecycle-framework` - Core knowledge including:
 - 8 lifecycle phases with evaluation criteria
@@ -234,6 +280,12 @@ dev_server_url: "http://localhost:3000"
 - Report templates with ASCII diagrams
 - Journey evaluation methodology
 - Technical investigation patterns
+
+`mcp-evaluation-framework` - MCP-specific knowledge including:
+- Turn-based evaluation schema
+- MCP failure pattern detection
+- Improvement layer categorization
+- Intent derivation from product concepts
 
 ## Output Examples
 
@@ -285,19 +337,29 @@ ux-evaluator/
 │   └── plugin.json
 ├── commands/
 │   ├── ux-eval.md              # UX quality assessment
-│   └── dogfood.md              # Production readiness testing
+│   ├── dogfood.md              # Production readiness testing
+│   └── mcp-eval.md             # MCP app evaluation
 ├── agents/
 │   ├── ux-evaluator.md         # Heuristic-based UX evaluation
 │   ├── dogfooding-evaluator.md # User perspective evaluation
-│   └── technical-debugger.md   # Code investigation
+│   ├── technical-debugger.md   # Code investigation
+│   ├── infrastructure-auditor.md # Backend verification
+│   └── mcp-evaluator.md        # MCP app evaluation
 ├── skills/
-│   └── user-lifecycle-framework/
+│   ├── user-lifecycle-framework/
+│   │   ├── SKILL.md
+│   │   └── references/
+│   │       ├── phase-heuristics.md
+│   │       ├── report-templates.md
+│   │       ├── journey-evaluation.md
+│   │       └── technical-investigation.md
+│   └── mcp-evaluation-framework/
 │       ├── SKILL.md
 │       └── references/
-│           ├── phase-heuristics.md
-│           ├── report-templates.md
-│           ├── journey-evaluation.md
-│           └── technical-investigation.md
+│           ├── turn-evaluation-schema.md
+│           ├── failure-patterns.md
+│           ├── improvement-layers.md
+│           └── intent-derivation.md
 ├── examples/
 │   └── ux-evaluator.local.md.example
 └── README.md
