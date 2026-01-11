@@ -19,6 +19,18 @@
       "description": "Codex port of the ux-evaluator plugin with ux-eval, dogfood, and mcp-eval modes"
     },
     {
+      "name": "agentic-optimization-craft",
+      "path": "codex-skills/agentic-optimization-craft",
+      "version": "0.1.0",
+      "description": "Hypothesis-driven optimization loop for AI agents with persistent state and compounding"
+    },
+    {
+      "name": "evaluation-design",
+      "path": "codex-skills/evaluation-design",
+      "version": "0.1.0",
+      "description": "Design metrics, datasets, and grading strategies for agent evaluation"
+    },
+    {
       "name": "work-toolkit-linear",
       "path": "codex-skills/work-toolkit-linear",
       "version": "0.1.0",
@@ -125,6 +137,30 @@
       "path": "codex-skills/langfuse-dataset-setup",
       "version": "0.1.0",
       "description": "Wizard for Langfuse dataset and judge setup"
+    },
+    {
+      "name": "compound-improvement-cycle-setup",
+      "path": "codex-skills/compound-improvement-cycle-setup",
+      "version": "0.1.0",
+      "description": "Improvement mindset for compounding learnings during work"
+    },
+    {
+      "name": "compound-reflection-craft",
+      "path": "codex-skills/compound-reflection-craft",
+      "version": "0.1.0",
+      "description": "Trace-aware reflection workflow to capture structured learnings"
+    },
+    {
+      "name": "compound-discovery-craft",
+      "path": "codex-skills/compound-discovery-craft",
+      "version": "0.1.0",
+      "description": "Pattern extraction and component specification for new capabilities"
+    },
+    {
+      "name": "compound-consolidation-craft",
+      "path": "codex-skills/compound-consolidation-craft",
+      "version": "0.1.0",
+      "description": "Review and implement compound learnings into skills and plugins"
     }
   ]
 }

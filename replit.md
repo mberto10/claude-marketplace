@@ -17,17 +17,5 @@ Documentation/Content repository with a simple Node.js server to display the plu
 ## Running Locally
 The project runs a simple Node.js HTTP server on port 5000 that displays the plugin catalog and README documentation.
 
-## Available Plugins
-- **mberto-core** - Core infrastructure with MCP servers
-- **langfuse-analyzer** - Langfuse trace retrieval and debugging
-- **langdock-dev** - Langdock integration actions
-- **writing-studio** - Writing assistant with style learning
-- **work-toolkit** - Personal management and productivity
-- **thinking-studio** - Personal thinking patterns and ideas
-- **openai-apps-sdk** - MCP server building toolkit
-- **compound-loop** - Structured feedback loop for improvements
-- **continuous-compound** - Long-running agent continuity
-- **daily-metrics** - Personal tracking and goal management
-
 ## Deployment
 Configured for autoscale deployment running `node server.js`.
