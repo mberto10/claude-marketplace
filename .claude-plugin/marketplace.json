@@ -122,27 +122,6 @@
       "category": "productivity"
     },
     {
-      "name": "thinking-studio",
-      "source": "./plugins/thinking-studio",
-      "description": "Personal thinking patterns and resonant ideas - your mental model fingerprint",
-      "version": "0.1.0",
-      "author": {
-        "name": "Maximilian Bruhn",
-        "email": "puzzle.ai.studio@gmail.com"
-      },
-      "homepage": "https://github.com/mberto10/mberto-compound",
-      "repository": "https://github.com/mberto10/mberto-compound",
-      "license": "MIT",
-      "keywords": [
-        "thinking",
-        "mental-models",
-        "ideas",
-        "patterns",
-        "personal"
-      ],
-      "category": "personal"
-    },
-    {
       "name": "openai-apps-sdk",
       "source": "./plugins/openai-apps-sdk",
       "description": "Comprehensive toolkit for building MCP servers with the OpenAI Apps SDK. Provides skills, commands, and agents for creating ChatGPT apps with Python and TypeScript.",
