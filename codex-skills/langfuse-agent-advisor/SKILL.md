@@ -23,6 +23,14 @@ Cover three layers:
 
 Ask: "If the answer is correct but the reasoning is flawed, is that a pass or fail?"
 
+## Prerequisites
+
+Before proposing the evaluation plan, confirm:
+
+- **Tracing is active:** agent generates Langfuse traces with key steps instrumented.
+- **Dataset exists (or can be created):** an initial eval set (from production traces, curated cases, or synthetic data).
+- **Target metric is defined:** primary metric, target value, and guardrail constraints.
+
 ## Dataset Strategy
 
 Recommend a mix of:
@@ -30,6 +38,8 @@ Recommend a mix of:
 - Edge cases (rare but valid)
 - Known failures (production regressions)
 - Adversarial inputs (prompt injection, contradictions)
+
+Explicitly call out **compounding**: turn failures into new test cases and link them into the persistent optimization loop so the dataset grows every iteration.
 
 If no production data exists, propose synthetic data generation and then add real traces over time.
 
@@ -46,4 +56,5 @@ If no production data exists, propose synthetic data generation and then add rea
 Deliver a concise plan with:
 - Proposed dimensions and thresholds
 - Dataset source and size
+- A step to update the dataset after each iteration (capture failures → new eval cases)
 - Suggested Langfuse skills to run next
