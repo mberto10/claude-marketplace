@@ -57,10 +57,15 @@ Learnings persist:
 Every failure from the current iteration is a candidate for the dataset.
 
 ```python
+from langfuse import Langfuse
+lf = Langfuse()
+
 for failure in iteration_failures:
     # Only add if we have clear expected output
     if can_determine_expected_output(failure):
-        dataset.create_item(
+        # Note: use lf.create_dataset_item(), not dataset.create_item()
+        lf.create_dataset_item(
+            dataset_name="<dataset_name>",
             input=failure.input,
             expected_output=determine_expected_output(failure),
             metadata={
