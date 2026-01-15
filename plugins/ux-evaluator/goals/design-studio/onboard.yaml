@@ -1,0 +1,171 @@
+# Design Studio Goals: ONBOARD Phase
+# "Help me get started" - First-time setup and configuration
+
+product: design-studio
+phase: ONBOARD
+description: |
+  Goals for users setting up their first design in Design Studio.
+  Focus on initial configuration, understanding the interface, and
+  establishing a working design system.
+
+goals:
+  # ---------------------------------------------------------------------------
+  # Goal: Create first design from scratch
+  # ---------------------------------------------------------------------------
+  - id: first_design_creation
+    statement: "Create my first design from scratch"
+    type: configuration
+
+    success_criteria:
+      - User can find and click "New Design" action
+      - Blank design canvas loads without errors
+      - User can set a design name
+      - Brand colors are configurable via color pickers
+      - Typography settings are adjustable
+      - At least one section can be added to layout
+      - Design saves successfully (no error toast)
+      - Design persists after page refresh
+
+    layer_weights:
+      ux: 0.6      # Primary - UI interaction heavy
+      code: 0.2    # Transform config to API payload
+      ai: 0.0      # No AI involvement
+      infra: 0.2   # Database persistence
+
+    preconditions:
+      - User is authenticated
+      - Design Studio page is accessible at /design-studio
+      - Backend API is running
+
+    evaluation_hints:
+      ux:
+        - Check if "New Design" button is discoverable
+        - Verify form labels are clear
+        - Confirm save feedback is visible
+      code:
+        - Verify config transforms correctly to API payload
+        - Check state updates after save
+      infra:
+        - Confirm POST /api/designs succeeds
+        - Verify GET /api/designs returns saved design
+
+    tags:
+      - critical-path
+      - new-user
+      - regression-test
+
+  # ---------------------------------------------------------------------------
+  # Goal: Start from a template
+  # ---------------------------------------------------------------------------
+  - id: template_start
+    statement: "Start from a template and customize it"
+    type: configuration
+
+    success_criteria:
+      - User can browse available starter templates
+      - Template preview shows before selection
+      - Clicking template loads it into editor
+      - All template settings are editable
+      - Customizations can be saved as new design
+      - Original template remains unchanged
+
+    layer_weights:
+      ux: 0.5      # Template browsing, selection UI
+      code: 0.3    # Clone logic, state management
+      ai: 0.0      # No AI involvement
+      infra: 0.2   # Template retrieval, save new design
+
+    preconditions:
+      - User is authenticated
+      - Design Studio page is accessible
+      - At least one starter template exists
+
+    evaluation_hints:
+      ux:
+        - Check template gallery layout and discoverability
+        - Verify preview accurately represents template
+        - Confirm clear distinction between "use template" and "edit original"
+      code:
+        - Verify clone creates new design with unique ID
+        - Check template data is deep-copied, not referenced
+      infra:
+        - Confirm templates load from /api/designs/starters
+        - Verify cloned design saves independently
+
+    tags:
+      - new-user
+      - low-friction-path
+
+  # ---------------------------------------------------------------------------
+  # Goal: Understand the interface
+  # ---------------------------------------------------------------------------
+  - id: interface_orientation
+    statement: "Understand what each part of the Design Studio does"
+    type: navigation
+
+    success_criteria:
+      - User can identify the main editing areas
+      - Tab navigation is clear (Branding, Typography, Sections)
+      - Preview panel purpose is obvious
+      - Save/discard actions are discoverable
+      - User understands how changes affect preview
+
+    layer_weights:
+      ux: 0.9      # Almost entirely UI/UX
+      code: 0.1    # Minor - state affects which tab shows
+      ai: 0.0      # No AI involvement
+      infra: 0.0   # No backend involvement
+
+    preconditions:
+      - User is on Design Studio page
+      - A design is loaded (new or existing)
+
+    evaluation_hints:
+      ux:
+        - Check visual hierarchy guides attention correctly
+        - Verify tab labels describe content accurately
+        - Confirm preview updates in real-time on changes
+        - Look for onboarding hints or tooltips (if any)
+
+    tags:
+      - new-user
+      - discoverability
+
+  # ---------------------------------------------------------------------------
+  # Goal: Configure brand colors
+  # ---------------------------------------------------------------------------
+  - id: configure_brand_colors
+    statement: "Set my brand's primary and accent colors"
+    type: configuration
+
+    success_criteria:
+      - User can find color configuration controls
+      - Color picker allows custom hex values
+      - Preview updates immediately when color changes
+      - Colors persist after save and reload
+      - Colors are visually applied to preview sections
+
+    layer_weights:
+      ux: 0.5      # Color picker UX, preview feedback
+      code: 0.3    # Color state management, preview rendering
+      ai: 0.0      # No AI involvement
+      infra: 0.2   # Persistence of color values
+
+    preconditions:
+      - User has a design open in editor
+      - Branding tab is accessible
+
+    evaluation_hints:
+      ux:
+        - Check color picker accessibility (keyboard, contrast)
+        - Verify color labels are meaningful (Primary, Accent, etc.)
+        - Confirm preview accurately reflects selected colors
+      code:
+        - Verify color values stored in correct format (hex)
+        - Check preview component receives color props
+      infra:
+        - Confirm colors round-trip through save/load
+
+    tags:
+      - core-feature
+      - configuration-fidelity

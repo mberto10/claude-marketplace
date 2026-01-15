@@ -1,0 +1,161 @@
+# Design Studio Goals: ACTIVATE Phase
+# "Aha! This is useful" - First value delivery
+
+product: design-studio
+phase: ACTIVATE
+description: |
+  Goals for users experiencing the first "aha moment" with Design Studio.
+  Focus on seeing the design come to life and understanding its value
+  for their newsletter.
+
+goals:
+  # ---------------------------------------------------------------------------
+  # Goal: See design preview with real content
+  # ---------------------------------------------------------------------------
+  - id: preview_with_content
+    statement: "See how my design looks with real newsletter content"
+    type: configuration
+
+    success_criteria:
+      - Preview panel shows realistic content layout
+      - Configured sections render with sample content
+      - Brand colors are applied throughout preview
+      - Typography settings affect preview text
+      - Preview represents how actual newsletter will look
+
+    layer_weights:
+      ux: 0.4      # Preview visibility, layout clarity
+      code: 0.5    # Component rendering, prop passing
+      ai: 0.0      # No AI involvement
+      infra: 0.1   # May load sample content from API
+
+    preconditions:
+      - User has a design with at least one section
+      - Preview panel is visible
+
+    evaluation_hints:
+      ux:
+        - Check preview accurately represents final output
+        - Verify preview updates in real-time
+        - Confirm preview is large enough to assess design
+      code:
+        - Verify section components receive correct props
+        - Check branding values propagate to preview
+        - Confirm typography scales correctly
+      infra:
+        - Check if sample content loads (if applicable)
+
+    tags:
+      - aha-moment
+      - core-feature
+
+  # ---------------------------------------------------------------------------
+  # Goal: Add and configure a section
+  # ---------------------------------------------------------------------------
+  - id: add_section
+    statement: "Add a content section to my newsletter layout"
+    type: configuration
+
+    success_criteria:
+      - User can find "Add Section" action
+      - Available section types are displayed
+      - Section type descriptions help user choose
+      - Selected section appears in layout
+      - Section can be configured (variant, item count, etc.)
+      - Preview updates to show new section
+
+    layer_weights:
+      ux: 0.6      # Section selection UI, configuration forms
+      code: 0.3    # Section state management, preview update
+      ai: 0.0      # No AI involvement
+      infra: 0.1   # Section config persistence
+
+    preconditions:
+      - User has a design open in editor
+      - Sections tab is accessible
+
+    evaluation_hints:
+      ux:
+        - Check section types are clearly differentiated
+        - Verify section configuration options are intuitive
+        - Confirm drag-and-drop reordering works (if available)
+      code:
+        - Verify section added to design state correctly
+        - Check section props pass to preview component
+      infra:
+        - Confirm section config persists in save
+
+    tags:
+      - core-feature
+      - configuration-fidelity
+
+  # ---------------------------------------------------------------------------
+  # Goal: See immediate feedback on changes
+  # ---------------------------------------------------------------------------
+  - id: real_time_preview
+    statement: "See my changes reflected immediately in the preview"
+    type: configuration
+
+    success_criteria:
+      - Color changes update preview instantly
+      - Typography changes reflect in preview text
+      - Section additions appear in preview immediately
+      - No page refresh required to see changes
+      - Preview feels responsive (< 500ms latency)
+
+    layer_weights:
+      ux: 0.3      # Visual feedback, latency perception
+      code: 0.6    # State management, re-render efficiency
+      ai: 0.0      # No AI involvement
+      infra: 0.1   # Local state, minimal backend
+
+    preconditions:
+      - User has a design open with preview visible
+
+    evaluation_hints:
+      ux:
+        - Measure perceived latency of preview updates
+        - Check for visual glitches during updates
+        - Verify no "flash" or layout shift
+      code:
+        - Check React state updates trigger re-render
+        - Verify no unnecessary re-renders (performance)
+        - Confirm preview component receives updated props
+
+    tags:
+      - responsiveness
+      - core-feature
+
+  # ---------------------------------------------------------------------------
+  # Goal: Understand section types
+  # ---------------------------------------------------------------------------
+  - id: understand_sections
+    statement: "Understand what each section type does and when to use it"
+    type: navigation
+
+    success_criteria:
+      - Each section type has a clear name
+      - Section descriptions explain purpose
+      - Visual preview or icon represents section
+      - User can distinguish between section types
+      - Examples or use cases are provided (optional)
+
+    layer_weights:
+      ux: 0.9      # Information design, clarity
+      code: 0.1    # Component metadata display
+      ai: 0.0      # No AI involvement
+      infra: 0.0   # No backend involvement
+
+    preconditions:
+      - Section selection interface is accessible
+
+    evaluation_hints:
+      ux:
+        - Check section names are descriptive
+        - Verify descriptions are jargon-free
+        - Confirm visual differentiation is clear
+        - Look for preview thumbnails or examples
+
+    tags:
+      - discoverability
+      - new-user

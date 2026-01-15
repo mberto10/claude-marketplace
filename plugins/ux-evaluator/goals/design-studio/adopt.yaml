@@ -1,0 +1,207 @@
+# Design Studio Goals: ADOPT Phase
+# "This is how I use it" - Core workflow establishment
+
+product: design-studio
+phase: ADOPT
+description: |
+  Goals for users establishing their regular workflow with Design Studio.
+  Focus on efficient iteration, data safety, and confident usage patterns.
+
+goals:
+  # ---------------------------------------------------------------------------
+  # Goal: Edit an existing design
+  # ---------------------------------------------------------------------------
+  - id: edit_existing_design
+    statement: "Make changes to a design I created earlier"
+    type: configuration
+
+    success_criteria:
+      - User can find and select existing design from list
+      - Design loads with all previous settings intact
+      - All configuration options are editable
+      - Changes can be saved without creating duplicate
+      - Updated design reflects changes after reload
+
+    layer_weights:
+      ux: 0.3      # Design list navigation, edit flow
+      code: 0.3    # State hydration, update logic
+      ai: 0.0      # No AI involvement
+      infra: 0.4   # Load existing, update in place
+
+    preconditions:
+      - User has at least one saved design
+      - Design Studio is accessible
+
+    evaluation_hints:
+      ux:
+        - Check design list shows meaningful identifiers
+        - Verify edit action is discoverable
+        - Confirm dirty state indicator shows unsaved changes
+      code:
+        - Verify design data hydrates to correct state
+        - Check update mutation patches (not replaces) design
+      infra:
+        - Confirm GET /api/designs/{id} returns full design
+        - Verify PUT /api/designs/{id} updates correctly
+
+    tags:
+      - core-workflow
+      - regression-test
+
+  # ---------------------------------------------------------------------------
+  # Goal: Recover from accidental changes
+  # ---------------------------------------------------------------------------
+  - id: recover_from_mistakes
+    statement: "Undo changes I made by mistake"
+    type: recovery
+
+    success_criteria:
+      - User warned before losing unsaved changes (navigation)
+      - Dirty indicator shows when changes exist
+      - Discard action available to revert to saved state
+      - Accidental browser close doesn't lose new designs
+      - Recovery option for crashed sessions (localStorage)
+
+    layer_weights:
+      ux: 0.5      # Warning dialogs, dirty indicators
+      code: 0.4    # State comparison, localStorage backup
+      ai: 0.0      # No AI involvement
+      infra: 0.1   # Reload from database
+
+    preconditions:
+      - User has made unsaved changes to a design
+
+    evaluation_hints:
+      ux:
+        - Check beforeunload warning fires on navigation
+        - Verify dirty indicator is visible and clear
+        - Confirm discard button exists and works
+        - Look for recovery dialog on return after crash
+      code:
+        - Verify isDirty state tracked correctly
+        - Check localStorage backup for new designs
+        - Confirm recovery dialog offers restore option
+
+    tags:
+      - data-safety
+      - error-recovery
+
+  # ---------------------------------------------------------------------------
+  # Goal: Manage multiple designs
+  # ---------------------------------------------------------------------------
+  - id: manage_multiple_designs
+    statement: "Organize and manage multiple newsletter designs"
+    type: operational
+
+    success_criteria:
+      - User can see list of all their designs
+      - Designs are identifiable (name, date, status)
+      - User can create new, edit existing, or delete
+      - Design status (draft, active) is visible
+      - Sorting/filtering available for many designs (optional)
+
+    layer_weights:
+      ux: 0.5      # List UI, management actions
+      code: 0.2    # List state, action handlers
+      ai: 0.0      # No AI involvement
+      infra: 0.3   # List endpoint, CRUD operations
+
+    preconditions:
+      - User has multiple saved designs
+      - Design list view is accessible
+
+    evaluation_hints:
+      ux:
+        - Check design cards show useful info at glance
+        - Verify actions (edit, delete) are accessible
+        - Confirm delete has confirmation dialog
+      code:
+        - Verify list updates after CRUD operations
+        - Check optimistic updates for responsiveness
+      infra:
+        - Confirm GET /api/designs returns all user designs
+        - Verify DELETE /api/designs/{id} removes design
+
+    tags:
+      - power-user
+      - scalability
+
+  # ---------------------------------------------------------------------------
+  # Goal: Iterate on design quickly
+  # ---------------------------------------------------------------------------
+  - id: rapid_iteration
+    statement: "Quickly try different design options and compare"
+    type: configuration
+
+    success_criteria:
+      - Changes apply instantly to preview
+      - Switching between tabs preserves changes
+      - Auto-save prevents data loss during iteration
+      - Can rapidly cycle through color/font options
+      - Performance remains smooth during rapid changes
+
+    layer_weights:
+      ux: 0.3      # Responsiveness, tab switching
+      code: 0.5    # State management, debouncing, auto-save
+      ai: 0.0      # No AI involvement
+      infra: 0.2   # Auto-save persistence
+
+    preconditions:
+      - User has a design open in editor
+      - Auto-save is enabled (for existing designs)
+
+    evaluation_hints:
+      ux:
+        - Measure responsiveness of rapid changes
+        - Check for UI lag or jank during iteration
+        - Verify tab switching doesn't lose in-progress changes
+      code:
+        - Verify debounce prevents excessive API calls
+        - Check auto-save triggers after idle period
+        - Confirm state persists across tab switches
+      infra:
+        - Monitor API call frequency during rapid changes
+        - Verify auto-save endpoint handles updates
+
+    tags:
+      - performance
+      - power-user
+
+  # ---------------------------------------------------------------------------
+  # Goal: Use design with composition
+  # ---------------------------------------------------------------------------
+  - id: connect_to_composition
+    statement: "Use my design as the visual style for a newsletter composition"
+    type: configuration
+
+    success_criteria:
+      - Design can be associated with a composition
+      - Composition preview shows design styling
+      - Design changes reflect in composition output
+      - Clear indication of which design is active
+
+    layer_weights:
+      ux: 0.3      # Association UI, status indication
+      code: 0.3    # Design-composition linking logic
+      ai: 0.0      # No AI involvement
+      infra: 0.4   # Foreign key relationship, retrieval
+
+    preconditions:
+      - User has at least one saved design
+      - User has access to composition management
+
+    evaluation_hints:
+      ux:
+        - Check design selection is available in composition
+        - Verify active design is clearly indicated
+        - Confirm design changes propagate to composition
+      code:
+        - Verify design_id stored in composition config
+        - Check design data loaded when rendering composition
+      infra:
+        - Confirm composition stores design reference
+        - Verify design retrieval when composition loads
+
+    tags:
+      - integration
+      - advanced

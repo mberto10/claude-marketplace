@@ -1,0 +1,139 @@
+# Goal Library Index
+# Master index of all goal libraries for Goal-Driven E2E Evaluation
+
+version: "1.0.0"
+last_updated: "2026-01-15"
+
+# =============================================================================
+# PRODUCTS
+# =============================================================================
+
+products:
+  design-studio:
+    name: "Design Studio"
+    description: "Visual design system configuration for newsletters"
+    url_pattern: "/design-studio"
+
+    # Layer involvement for this product area
+    layers:
+      ux: true       # Heavy UI interaction
+      code: true     # Config transforms, state management
+      ai: false      # No AI features currently
+      infra: true    # Persistence, retrieval
+
+    # Goal files for this product
+    goal_files:
+      - onboard.yaml    # First-time setup goals
+      - activate.yaml   # First value goals
+      - adopt.yaml      # Regular usage goals
+
+    # Product-specific context
+    context:
+      value_proposition: "Create professional newsletter designs without coding"
+      target_user: "Newsletter creators, content teams"
+      core_loop: "Configure branding → Add sections → Preview → Save"
+      success_metrics:
+        - Design saved successfully
+        - Preview renders correctly
+        - Configuration persists across sessions
+
+  # Future product areas (placeholders)
+  # command-center:
+  #   name: "Command Center"
+  #   description: "Operations dashboard and management"
+  #   layers: {ux: true, code: true, ai: true, infra: true}
+  #   goal_files: [onboard.yaml, activate.yaml, engage.yaml]
+
+  # publication-flow:
+  #   name: "Publication Flow"
+  #   description: "Newsletter creation and publishing workflow"
+  #   layers: {ux: true, code: true, ai: true, infra: true}
+  #   goal_files: [onboard.yaml, activate.yaml, adopt.yaml, retain.yaml]
+
+# =============================================================================
+# GOAL TYPES
+# =============================================================================
+
+goal_types:
+  navigation:
+    description: "User wants to find or reach something"
+    primary_layers: [ux]
+    evaluation_focus: "Information architecture, discoverability"
+
+  configuration:
+    description: "User wants to set something up"
+    primary_layers: [ux, code, infra]
+    evaluation_focus: "Form flows, data transforms, persistence"
+
+  generation:
+    description: "User wants AI-generated output"
+    primary_layers: [ux, code, ai, infra]
+    evaluation_focus: "Input handling, AI quality, output delivery"
+
+  operational:
+    description: "User wants to monitor or manage operations"
+    primary_layers: [ux, code, infra]
+    evaluation_focus: "Status visibility, action effectiveness"
+
+  recovery:
+    description: "User wants to fix something that went wrong"
+    primary_layers: [ux, code]
+    evaluation_focus: "Error handling, undo capability, state repair"
+
+# =============================================================================
+# LIFECYCLE PHASES
+# =============================================================================
+
+lifecycle_phases:
+  DISCOVER:
+    user_question: "Why should I care?"
+    focus: "Value communication, conversion triggers"
+
+  SIGN_UP:
+    user_question: "Let me in"
+    focus: "Friction reduction, trust signals"
+
+  ONBOARD:
+    user_question: "Help me get started"
+    focus: "Guidance clarity, progress visibility"
+
+  ACTIVATE:
+    user_question: "Aha! This is useful"
+    focus: "First value delivery, success moment"
+
+  ADOPT:
+    user_question: "This is how I use it"
+    focus: "Core loop establishment, muscle memory"
+
+  ENGAGE:
+    user_question: "I check this regularly"
+    focus: "Habit formation, return triggers"
+
+  RETAIN:
+    user_question: "I can't work without this"
+    focus: "Ongoing value demonstration"
+
+  EXPAND:
+    user_question: "I want more"
+    focus: "Growth paths, upgrade clarity"
+
+# =============================================================================
+# EVALUATION AGENTS
+# =============================================================================
+
+layer_agents:
+  ux:
+    agent: "ux-evaluator"
+    focus: "Journey friction, clarity, feedback"
+
+  code:
+    agent: "technical-debugger"
+    focus: "Logic errors, transforms, handlers"
+
+  ai:
+    agent: "ai-trace-analyst"  # Future agent
+    focus: "Prompt effectiveness, output quality"
+
+  infra:
+    agent: "infrastructure-auditor"
+    focus: "Persistence, APIs, external services"
